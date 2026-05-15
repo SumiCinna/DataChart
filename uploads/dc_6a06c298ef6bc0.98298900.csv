@@ -1,0 +1,101 @@
+Project_ID,Project_Description,Region,Start_Date,End_Date,Status,Cost,Funding_Source,Contractor,Priority_Level,Maintenance_Category,Safety_Rating,Location_City
+FC-001,Culvert Installation,Region IV-A,2023-06-27,2024-09-27,Under Review,661886999,Government,AquaFlow Solutions,Medium,Major,C,Manila
+FC-002,Seawall Restoration,NCR,2023-01-11,2024-05-03,Completed,327968081,International Aid,EcoClear Ltd,Low,Emergency,A,Cebu City
+FC-003,Riverbank Stabilization,NCR,2023-01-05,2023-07-15,Completed,91646191,Grant,TerraFirm,High,Minor,B,Manila
+FC-004,Waterway Clearing,Region III,2023-01-23,2024-06-24,Under Review,197237101,Grant,OceanGuard Co.,Low,Minor,B,Quezon City
+FC-005,Bridge Abutment Reinforcement,NCR,2023-06-23,2025-01-04,Completed,949594715,International Aid,UrbanInfra,Low,Minor,A,Manila
+FC-006,Pumping Station Repair,Region I,2023-01-06,2024-08-19,Completed,695686706,Government,AquaFlow Solutions,Low,Minor,B,Davao
+FC-007,Bridge Abutment Reinforcement,Region VII,2023-06-25,2025-02-08,Ongoing,526544249,Private,EcoClear Ltd,Medium,Emergency,B,Pampanga
+FC-008,Pumping Station Repair,Region IV-A,2023-04-23,2023-09-09,Planned,508615511,International Aid,OceanGuard Co.,Medium,Routine,A,Manila
+FC-009,Seawall Restoration,Region VII,2023-02-08,2024-09-23,Under Review,839739439,Private,OceanGuard Co.,Low,Emergency,A,Quezon City
+FC-010,Construction of Dikes,Region I,2023-12-10,2024-09-13,Planned,802696222,Private,OceanGuard Co.,High,Emergency,B,Manila
+FC-011,Bridge Abutment Reinforcement,Region IV-A,2023-02-28,2024-12-28,Ongoing,846189229,Grant,AquaFlow Solutions,Medium,Routine,B,Pampanga
+FC-012,Riverbank Stabilization,NCR,2023-10-21,2025-02-08,Under Review,64894059,Grant,TerraFirm,Medium,Routine,B,Davao
+FC-013,Pumping Station Repair,Region I,2023-07-06,2023-10-04,Planned,812786654,International Aid,EcoClear Ltd,High,Emergency,C,Iloilo
+FC-014,Drainage System Upgrade,Region I,2023-06-03,2024-06-22,Completed,176964240,Government,UrbanInfra,High,Major,A,Pampanga
+FC-015,Waterway Clearing,Region III,2023-06-17,2024-04-21,Ongoing,560667446,Private,EcoClear Ltd,High,Routine,C,Manila
+FC-016,Floodway Maintenance,NCR,2023-08-30,2024-08-05,Completed,520086353,Government,BuildCorp Inc.,High,Major,B,Cebu City
+FC-017,Seawall Restoration,Region I,2023-08-29,2023-11-17,Ongoing,549314152,Government,OceanGuard Co.,High,Routine,A,Manila
+FC-018,Dredging Operations,Region VII,2023-08-03,2025-03-03,Ongoing,855366121,International Aid,EcoClear Ltd,Medium,Routine,B,Iloilo
+FC-019,Dredging Operations,Region I,2023-07-16,2023-09-11,Ongoing,801999937,International Aid,OceanGuard Co.,High,Major,B,Quezon City
+FC-020,Waterway Clearing,Region IV-A,2023-11-21,2024-01-18,Planned,559366338,Grant,UrbanInfra,Low,Major,B,Malolos
+FC-021,Seawall Restoration,Region XI,2023-12-04,2025-05-25,Completed,716192514,International Aid,OceanGuard Co.,Low,Major,A,Cebu City
+FC-022,Bridge Abutment Reinforcement,Region III,2023-11-11,2025-10-21,Completed,875674746,International Aid,EcoClear Ltd,High,Emergency,A,Pampanga
+FC-023,Drainage System Upgrade,Region I,2023-05-18,2025-04-05,Under Review,838542805,International Aid,UrbanInfra,Medium,Major,A,Malolos
+FC-024,Floodway Maintenance,Region IV-A,2023-12-29,2024-12-16,Planned,688432364,Private,AquaFlow Solutions,High,Minor,C,Pampanga
+FC-025,Dredging Operations,Region IV-A,2023-07-22,2024-11-24,Completed,159286010,Private,EcoClear Ltd,Medium,Minor,C,Quezon City
+FC-026,Construction of Dikes,Region I,2023-05-20,2024-11-13,Completed,745473417,Private,BuildCorp Inc.,Low,Emergency,A,Cebu City
+FC-027,Construction of Dikes,Region VII,2023-10-31,2025-03-17,Ongoing,794364134,International Aid,UrbanInfra,Low,Routine,C,Quezon City
+FC-028,Construction of Dikes,Region VII,2023-10-31,2024-06-05,Ongoing,711863574,Private,AquaFlow Solutions,Medium,Routine,B,Quezon City
+FC-029,Bridge Abutment Reinforcement,Region XI,2023-03-12,2023-09-25,Planned,221592707,Grant,BuildCorp Inc.,Low,Routine,C,Pampanga
+FC-030,Construction of Dikes,NCR,2023-06-29,2024-07-22,Planned,752007464,Government,BuildCorp Inc.,High,Routine,C,Quezon City
+FC-031,Riverbank Stabilization,Region XI,2023-02-12,2023-04-01,Completed,239671494,Grant,TerraFirm,High,Major,B,Manila
+FC-032,Pumping Station Repair,Region VII,2023-07-22,2025-06-15,Planned,148952808,International Aid,BuildCorp Inc.,High,Routine,B,Davao
+FC-033,Riverbank Stabilization,Region IV-A,2023-09-30,2024-09-14,Under Review,53202196,Private,OceanGuard Co.,Medium,Routine,A,Quezon City
+FC-034,Seawall Restoration,Region I,2023-10-09,2023-12-31,Completed,849709043,Grant,UrbanInfra,Medium,Emergency,B,Cebu City
+FC-035,Floodway Maintenance,Region I,2023-08-19,2024-10-31,Completed,218956585,International Aid,AquaFlow Solutions,High,Emergency,B,Malolos
+FC-036,Riverbank Stabilization,Region III,2023-12-23,2025-04-12,Under Review,547896612,Private,OceanGuard Co.,High,Minor,C,Cebu City
+FC-037,Pumping Station Repair,Region I,2023-05-13,2025-01-27,Ongoing,53111819,Private,BuildCorp Inc.,Low,Routine,C,Davao
+FC-038,Construction of Dikes,NCR,2023-06-22,2023-10-05,Ongoing,662140981,Private,TerraFirm,Medium,Emergency,B,Davao
+FC-039,Floodway Maintenance,Region VII,2023-08-06,2024-05-11,Ongoing,748437397,Private,OceanGuard Co.,High,Major,B,Pampanga
+FC-040,Pumping Station Repair,NCR,2023-10-02,2025-02-12,Ongoing,913657365,International Aid,TerraFirm,Medium,Minor,A,Davao
+FC-041,Bridge Abutment Reinforcement,Region III,2023-03-08,2023-09-06,Completed,73641761,Grant,BuildCorp Inc.,Medium,Emergency,C,Davao
+FC-042,Culvert Installation,Region III,2023-06-02,2024-09-04,Ongoing,374501238,Grant,TerraFirm,Low,Emergency,C,Quezon City
+FC-043,Construction of Dikes,Region XI,2023-08-29,2025-03-13,Planned,134126828,Government,TerraFirm,Low,Minor,C,Calamba
+FC-044,Construction of Dikes,Region IV-A,2023-04-01,2024-06-20,Planned,443728641,Government,EcoClear Ltd,Low,Emergency,C,Davao
+FC-045,Riverbank Stabilization,Region VII,2023-04-26,2024-03-19,Planned,924419466,Government,EcoClear Ltd,Medium,Major,A,Manila
+FC-046,Construction of Dikes,NCR,2023-02-18,2024-08-19,Under Review,639361032,Private,BuildCorp Inc.,Low,Minor,C,Cebu City
+FC-047,Dredging Operations,Region VII,2023-09-30,2025-04-13,Completed,929245973,Private,OceanGuard Co.,Low,Major,C,Manila
+FC-048,Drainage System Upgrade,Region III,2023-11-14,2023-12-14,Ongoing,797110809,Grant,OceanGuard Co.,Medium,Emergency,C,Calamba
+FC-049,Culvert Installation,Region VII,2023-09-09,2024-11-22,Completed,94781573,Grant,BuildCorp Inc.,High,Emergency,B,Pampanga
+FC-050,Bridge Abutment Reinforcement,Region I,2023-12-19,2024-09-16,Planned,870655853,Government,BuildCorp Inc.,Low,Minor,C,Iloilo
+FC-051,Construction of Dikes,Region IV-A,2023-05-21,2024-12-28,Ongoing,267308179,Grant,BuildCorp Inc.,High,Routine,A,Pampanga
+FC-052,Dredging Operations,Region XI,2023-05-26,2024-10-09,Under Review,537803764,Grant,UrbanInfra,High,Routine,B,Calamba
+FC-053,Dredging Operations,Region IV-A,2023-09-26,2024-08-17,Planned,124196526,Private,UrbanInfra,Low,Minor,C,Iloilo
+FC-054,Riverbank Stabilization,Region VII,2023-12-04,2025-07-28,Ongoing,195758047,Private,EcoClear Ltd,High,Major,A,Davao
+FC-055,Dredging Operations,Region III,2023-06-04,2025-01-30,Planned,900739680,Grant,TerraFirm,High,Major,C,Calamba
+FC-056,Riverbank Stabilization,Region VII,2023-02-10,2023-11-03,Ongoing,555216631,Grant,BuildCorp Inc.,Low,Emergency,B,Iloilo
+FC-057,Floodway Maintenance,Region I,2023-01-15,2024-01-18,Completed,141363644,International Aid,TerraFirm,Low,Minor,C,Pampanga
+FC-058,Dredging Operations,Region I,2023-07-31,2023-10-26,Completed,824054751,Government,AquaFlow Solutions,Low,Routine,C,Manila
+FC-059,Pumping Station Repair,Region IV-A,2023-05-06,2023-06-09,Ongoing,809388064,Grant,UrbanInfra,Medium,Major,C,Malolos
+FC-060,Seawall Restoration,Region I,2023-01-18,2023-09-26,Under Review,280063673,Grant,TerraFirm,Low,Routine,A,Davao
+FC-061,Construction of Dikes,Region I,2023-04-29,2025-01-01,Planned,167541626,Grant,AquaFlow Solutions,Medium,Minor,C,Quezon City
+FC-062,Riverbank Stabilization,Region IV-A,2023-07-10,2025-05-12,Ongoing,213638582,Private,OceanGuard Co.,Low,Major,B,Manila
+FC-063,Dredging Operations,NCR,2023-04-02,2023-08-18,Under Review,182691360,Government,UrbanInfra,Low,Emergency,B,Quezon City
+FC-064,Construction of Dikes,Region I,2023-05-31,2024-07-19,Planned,227411437,Government,EcoClear Ltd,Medium,Minor,C,Iloilo
+FC-065,Floodway Maintenance,Region I,2023-04-13,2023-08-29,Under Review,413053167,Government,UrbanInfra,Low,Minor,C,Iloilo
+FC-066,Dredging Operations,Region XI,2023-09-19,2023-10-22,Under Review,627093973,International Aid,BuildCorp Inc.,High,Major,C,Davao
+FC-067,Dredging Operations,Region VII,2023-02-12,2023-07-02,Under Review,99565616,Government,OceanGuard Co.,Low,Routine,B,Davao
+FC-068,Waterway Clearing,Region III,2023-09-14,2024-06-07,Completed,751439518,International Aid,TerraFirm,Low,Routine,A,Davao
+FC-069,Dredging Operations,Region I,2023-03-16,2024-11-09,Completed,413809222,Government,EcoClear Ltd,Low,Routine,A,Pampanga
+FC-070,Waterway Clearing,NCR,2023-07-19,2025-02-02,Completed,82497519,International Aid,UrbanInfra,Low,Emergency,A,Manila
+FC-071,Riverbank Stabilization,NCR,2023-01-17,2023-10-04,Completed,874194464,International Aid,TerraFirm,Low,Minor,B,Manila
+FC-072,Seawall Restoration,Region IV-A,2023-11-18,2025-10-06,Completed,610007038,International Aid,OceanGuard Co.,Low,Emergency,B,Davao
+FC-073,Drainage System Upgrade,Region XI,2023-04-14,2023-05-26,Planned,555639749,Grant,TerraFirm,Low,Emergency,C,Pampanga
+FC-074,Dredging Operations,Region IV-A,2023-02-10,2024-10-06,Ongoing,120907936,Grant,EcoClear Ltd,Medium,Emergency,A,Quezon City
+FC-075,Waterway Clearing,Region III,2023-10-22,2024-05-27,Ongoing,606923224,Government,OceanGuard Co.,Low,Emergency,C,Calamba
+FC-076,Pumping Station Repair,Region VII,2023-06-11,2024-02-14,Completed,152544418,Grant,OceanGuard Co.,Low,Routine,B,Calamba
+FC-077,Dredging Operations,Region XI,2023-02-24,2024-10-08,Completed,697402786,International Aid,BuildCorp Inc.,High,Emergency,B,Calamba
+FC-078,Construction of Dikes,Region III,2023-04-24,2025-01-24,Ongoing,693392743,Government,TerraFirm,Low,Major,A,Cebu City
+FC-079,Drainage System Upgrade,Region VII,2023-08-11,2025-03-26,Ongoing,452242192,Grant,TerraFirm,Medium,Major,C,Cebu City
+FC-080,Riverbank Stabilization,Region I,2023-07-28,2025-04-01,Planned,514564509,International Aid,UrbanInfra,Low,Emergency,B,Calamba
+FC-081,Drainage System Upgrade,Region XI,2023-12-20,2024-11-12,Planned,248333137,Private,BuildCorp Inc.,High,Routine,B,Quezon City
+FC-082,Drainage System Upgrade,NCR,2023-12-11,2025-12-08,Ongoing,488482969,Grant,BuildCorp Inc.,High,Routine,A,Malolos
+FC-083,Seawall Restoration,Region XI,2023-07-15,2025-06-12,Planned,293380411,International Aid,TerraFirm,Low,Emergency,C,Manila
+FC-084,Pumping Station Repair,Region I,2023-04-14,2024-02-04,Planned,394333719,Private,BuildCorp Inc.,Low,Minor,C,Calamba
+FC-085,Pumping Station Repair,Region IV-A,2023-02-08,2023-04-02,Ongoing,378559686,International Aid,OceanGuard Co.,Low,Minor,C,Manila
+FC-086,Floodway Maintenance,Region IV-A,2023-11-23,2024-04-24,Completed,431427824,Government,OceanGuard Co.,High,Minor,B,Pampanga
+FC-087,Riverbank Stabilization,Region I,2023-06-02,2025-01-09,Completed,466717940,Grant,BuildCorp Inc.,Low,Minor,B,Quezon City
+FC-088,Pumping Station Repair,Region III,2023-08-05,2024-11-19,Completed,387014992,Government,TerraFirm,Low,Routine,C,Calamba
+FC-089,Culvert Installation,Region I,2023-09-07,2025-03-09,Completed,133701149,Government,EcoClear Ltd,Medium,Minor,A,Quezon City
+FC-090,Seawall Restoration,Region III,2023-08-30,2025-01-31,Completed,795235516,Grant,BuildCorp Inc.,High,Routine,A,Calamba
+FC-091,Drainage System Upgrade,NCR,2023-01-04,2023-02-04,Ongoing,814719728,Private,UrbanInfra,Low,Emergency,C,Manila
+FC-092,Dredging Operations,Region IV-A,2023-10-24,2025-04-30,Completed,226931592,Government,UrbanInfra,Low,Minor,B,Calamba
+FC-093,Bridge Abutment Reinforcement,Region I,2023-11-12,2024-09-10,Planned,642611490,Government,TerraFirm,Medium,Minor,A,Malolos
+FC-094,Culvert Installation,Region VII,2023-07-02,2024-01-12,Ongoing,118397400,Private,AquaFlow Solutions,Medium,Emergency,B,Malolos
+FC-095,Construction of Dikes,NCR,2023-03-03,2024-10-27,Planned,530410129,Grant,OceanGuard Co.,Low,Emergency,B,Manila
+FC-096,Drainage System Upgrade,Region I,2023-09-30,2024-07-28,Completed,179226387,Government,EcoClear Ltd,Low,Emergency,A,Malolos
+FC-097,Construction of Dikes,Region XI,2023-10-19,2024-07-21,Under Review,864931382,Grant,BuildCorp Inc.,High,Major,C,Davao
+FC-098,Dredging Operations,Region VII,2024-01-01,2025-11-22,Planned,257834628,Grant,TerraFirm,Medium,Minor,A,Pampanga
+FC-099,Construction of Dikes,Region IV-A,2023-09-15,2024-08-22,Completed,945889825,Private,TerraFirm,Low,Major,C,Quezon City
+FC-100,Pumping Station Repair,Region III,2023-01-18,2024-02-07,Completed,287186123,International Aid,OceanGuard Co.,Low,Emergency,C,Quezon City
