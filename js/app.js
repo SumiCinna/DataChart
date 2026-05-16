@@ -6,151 +6,110 @@ const PALETTE = [
 ];
 
 const CHART_TYPES = ['line','bar','area','pie'];
-const MAX_DISPLAY_ROWS = 50;
 const MAX_CHART_POINTS = 30;
-const MAX_PIE_SLICES = 6;
+const MAX_PIE_SLICES   = 10;
+
+// Default display column per chart type — falls back if column doesn't exist in data
+const CHART_DEFAULTS = {
+  line: 'Contractor_1',
+  bar:  'FY',
+  area: 'Location',
+  pie:  'Region',
+};
 
 const state = {
   allRows:     [],
-  displayRows: [],
   headers:     [],
   numericCols: [],
-  labelCol:    '',
   filename:    '',
   theme:       localStorage.getItem('dc-theme') || 'dark',
   isRendering: false,
   renderTimeout: null,
   chartsToRender: new Set(),
-  pieData: null, // Fixed pie data - never changes on filter
   charts: {
-    line: { instance: null, activeKeys: [], filteredRows: [], filterCol: '', filterVal: '' },
-    bar:  { instance: null, activeKeys: [], filteredRows: [], filterCol: '', filterVal: '' },
-    area: { instance: null, activeKeys: [], filteredRows: [], filterCol: '', filterVal: '' },
-    pie:  { instance: null, activeKeys: [], filteredRows: [], filterCol: '', filterVal: '' },
+    line: { instance: null, activeKeys: [], displayCol: '' },
+    bar:  { instance: null, activeKeys: [], displayCol: '' },
+    area: { instance: null, activeKeys: [], displayCol: '' },
+    pie:  { instance: null, activeKeys: [], displayCol: '' },
   }
 };
+
+// Pick the best default column for a chart type from available headers
+function resolveDefault(type) {
+  const preferred = CHART_DEFAULTS[type];
+  const nonNumeric = state.headers.filter(h => !state.numericCols.includes(h));
+  // exact match first
+  if (preferred && state.headers.includes(preferred)) return preferred;
+  // case-insensitive match
+  const ci = nonNumeric.find(h => h.toLowerCase() === (preferred || '').toLowerCase());
+  if (ci) return ci;
+  // fallback: first non-numeric col
+  return nonNumeric[0] || state.headers[0] || '';
+}
 
 function initializeLoadingOverlay() {
   const style = document.createElement('style');
   style.textContent = `
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    
+    @keyframes spin { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
     #render-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(15, 23, 42, 0.85);
-      backdrop-filter: blur(4px);
-      -webkit-backdrop-filter: blur(4px);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 9998;
+      position:fixed;top:0;left:0;right:0;bottom:0;
+      background:rgba(15,23,42,0.85);
+      backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+      display:none;align-items:center;justify-content:center;z-index:9998;
     }
-    
-    #render-overlay.visible {
-      display: flex;
+    #render-overlay.visible{display:flex;}
+    .loader-container{display:flex;flex-direction:column;align-items:center;gap:16px;}
+    .spinner{
+      width:40px;height:40px;
+      border:3px solid rgba(59,130,246,0.2);
+      border-top:3px solid #3b82f6;
+      border-radius:50%;animation:spin 0.8s linear infinite;
     }
-    
-    .loader-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 16px;
-    }
-    
-    .spinner {
-      width: 40px;
-      height: 40px;
-      border: 3px solid rgba(59, 130, 246, 0.2);
-      border-top: 3px solid #3b82f6;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-    
-    .loader-text {
-      color: #94a3b8;
-      font-size: 13px;
-      font-family: 'IBM Plex Sans', sans-serif;
-      letter-spacing: 0.3px;
-    }
+    .loader-text{color:#94a3b8;font-size:13px;font-family:'IBM Plex Sans',sans-serif;letter-spacing:0.3px;}
   `;
   document.head.appendChild(style);
-  
   const overlay = document.createElement('div');
   overlay.id = 'render-overlay';
-  overlay.innerHTML = `
-    <div class="loader-container">
-      <div class="spinner"></div>
-      <div class="loader-text">Rendering charts...</div>
-    </div>
-  `;
+  overlay.innerHTML = `<div class="loader-container"><div class="spinner"></div><div class="loader-text">Rendering charts…</div></div>`;
   document.body.appendChild(overlay);
 }
 
 function showLoadingOverlay() {
-  const overlay = document.getElementById('render-overlay');
-  if (overlay) {
-    overlay.classList.add('visible');
-  }
+  document.getElementById('render-overlay')?.classList.add('visible');
   state.isRendering = true;
 }
-
 function hideLoadingOverlay() {
-  const overlay = document.getElementById('render-overlay');
-  if (overlay) {
-    overlay.classList.remove('visible');
-  }
+  document.getElementById('render-overlay')?.classList.remove('visible');
   state.isRendering = false;
 }
 
 function debounceRender() {
-  if (state.renderTimeout) {
-    clearTimeout(state.renderTimeout);
-  }
-  
+  if (state.renderTimeout) clearTimeout(state.renderTimeout);
   showLoadingOverlay();
-  
   state.renderTimeout = setTimeout(() => {
     try {
-      // Only render non-pie charts on filter change
-      ['line', 'bar', 'area'].forEach(type => {
+      CHART_TYPES.forEach(type => {
         if (state.chartsToRender.has(type)) {
           buildFilterPanel(type);
           buildSeriesPanel(type);
           renderChart(type);
+          buildChartNote(type);
         }
       });
-      // Pie only renders if explicitly marked
-      if (state.chartsToRender.has('pie')) {
-        buildFilterPanel('pie');
-        buildSeriesPanel('pie');
-        renderChart('pie');
-      }
       state.chartsToRender.clear();
-    } catch (error) {
-      console.error('Render error:', error);
-    }
+    } catch(e) { console.error('Render error:', e); }
     hideLoadingOverlay();
   }, 600);
 }
 
 function renderAllCharts() {
-  const hasNumeric = state.numericCols.length > 0;
   const noNumericWarn = document.getElementById('no-numeric-warn');
-  if (noNumericWarn) {
-    noNumericWarn.classList.toggle('hidden', hasNumeric);
-  }
-  
+  if (noNumericWarn) noNumericWarn.classList.toggle('hidden', state.numericCols.length > 0);
   CHART_TYPES.forEach(type => {
     buildFilterPanel(type);
     buildSeriesPanel(type);
     renderChart(type);
+    buildChartNote(type);
   });
   showDashboard();
 }
@@ -158,54 +117,31 @@ function renderAllCharts() {
 function parseNum(v) {
   if (v === null || v === undefined || v === '') return NaN;
   if (typeof v === 'number') return v;
-  const cleaned = String(v).replace(/[,\s$₱€£¥%]/g, '').trim();
-  const n = Number(cleaned);
+  const n = Number(String(v).replace(/[,\s$₱€£¥%]/g,'').trim());
   return isNaN(n) ? NaN : n;
 }
-
 function isValidHeader(h) {
   return typeof h === 'string' && h.trim() !== '' && h !== 'undefined' && h !== 'null';
 }
-
 function isNumericCol(rows, col) {
   const nonEmpty = rows.filter(r => r[col] !== null && r[col] !== undefined && r[col] !== '');
   if (!nonEmpty.length) return false;
   return nonEmpty.filter(r => !isNaN(parseNum(r[col]))).length / nonEmpty.length > 0.7;
 }
-
 function normalizeRows(rows, numericCols) {
   return rows.map(row => {
     const out = { ...row };
-    numericCols.forEach(col => {
-      const n = parseNum(row[col]);
-      out[col] = isNaN(n) ? 0 : n;
-    });
+    numericCols.forEach(col => { const n = parseNum(row[col]); out[col] = isNaN(n) ? 0 : n; });
     return out;
   });
 }
-
 function stripBlankHeaders(rows, fields) {
   const validFields = fields.filter(isValidHeader);
-  const cleanRows   = rows.map(row => {
-    const clean = {};
-    validFields.forEach(f => { clean[f] = row[f]; });
-    return clean;
-  });
-  return { rows: cleanRows, fields: validFields };
+  return {
+    rows: rows.map(row => { const c = {}; validFields.forEach(f => { c[f] = row[f]; }); return c; }),
+    fields: validFields
+  };
 }
-
-function limitDisplayRows(rows, labelCol, numericCols) {
-  const agg = aggregateByLabel(rows, labelCol, numericCols);
-  if (agg.length <= MAX_DISPLAY_ROWS) {
-    return agg;
-  }
-  
-  const sortKey = numericCols[0];
-  return agg
-    .sort((a, b) => b[sortKey] - a[sortKey])
-    .slice(0, MAX_DISPLAY_ROWS);
-}
-
 function aggregateByLabel(rows, labelCol, numericCols) {
   const map = new Map();
   rows.forEach(row => {
@@ -220,67 +156,50 @@ function aggregateByLabel(rows, labelCol, numericCols) {
   });
   return Array.from(map.values());
 }
-
 function fmtNum(v) {
   if (v >= 1e9) return (v / 1e9).toFixed(2) + 'B';
   if (v >= 1e6) return (v / 1e6).toFixed(2) + 'M';
   if (v >= 1e3) return (v / 1e3).toFixed(0) + 'K';
   return Number(v).toLocaleString();
 }
-
 function fmtTick(v) {
   if (v >= 1e9) return (v / 1e9).toFixed(1) + 'B';
   if (v >= 1e6) return (v / 1e6).toFixed(1) + 'M';
   if (v >= 1e3) return (v / 1e3).toFixed(0) + 'K';
   return Number(v).toLocaleString();
 }
+function wrapLabel(raw, maxLen = 44) {
+  const full = Array.isArray(raw) ? raw.join(' ') : String(raw ?? '');
+  const words = full.split(' ');
+  const lines = []; let line = '';
+  words.forEach(w => {
+    if ((line + ' ' + w).trim().length > maxLen) { if (line) lines.push(line.trim()); line = w; }
+    else line = (line + ' ' + w).trim();
+  });
+  if (line) lines.push(line.trim());
+  return lines;
+}
 
 function processRows(rawRows, rawFields, name) {
   const { rows, fields } = stripBlankHeaders(rawRows, rawFields);
+  if (!fields.length) { showToast('All columns have blank headers.', 'error'); hideLoadingOverlay(); return; }
 
-  if (!fields.length) {
-    showToast('All columns have blank headers — nothing to display.', 'error');
-    hideLoadingOverlay();
-    return;
-  }
-
-  const numeric     = fields.filter(c => isNumericCol(rows, c)).slice(0, 6);
-  const categorical = fields.find(c => !numeric.includes(c)) || fields[0];
-  const normalized  = normalizeRows(rows, numeric);
-  const limited     = limitDisplayRows(normalized, categorical, numeric);
+  const numeric    = fields.filter(c => isNumericCol(rows, c)).slice(0, 8);
+  const normalized = normalizeRows(rows, numeric);
 
   state.allRows     = normalized;
-  state.displayRows = limited;
   state.headers     = fields;
   state.numericCols = numeric;
-  state.labelCol    = categorical;
   state.filename    = name;
 
-  // Pre-calculate pie data ONCE - it never changes
-  const pieAgg = aggregateByLabel(state.displayRows, categorical, numeric);
-  const pieSorted = pieAgg
-    .map(r => ({ name: String(r[categorical] ?? ''), value: Number(r[numeric[0]] ?? 0) }))
-    .filter(d => d.value > 0)
-    .sort((a, b) => b.value - a.value);
-  
-  let pieSlices = pieSorted.slice(0, MAX_PIE_SLICES);
-  const remaining = pieSorted.slice(MAX_PIE_SLICES);
-  
-  if (remaining.length > 0) {
-    const otherValue = remaining.reduce((sum, d) => sum + d.value, 0);
-    pieSlices.push({ name: `Other (${remaining.length})`, value: otherValue });
-  }
-  
-  state.pieData = pieSlices;
-
+  // Assign each chart its default display column
   CHART_TYPES.forEach(t => {
-    state.charts[t].activeKeys   = [...numeric];
-    state.charts[t].filteredRows = [...limited];
-    state.charts[t].filterCol    = '';
-    state.charts[t].filterVal    = '';
+    state.charts[t].activeKeys  = [...numeric];
+    state.charts[t].displayCol  = resolveDefault(t);
   });
 
-  updateStats(rows.length, limited.length, fields.length, numeric);
+  const total = numeric[0] ? normalized.reduce((s, r) => s + Number(r[numeric[0]] || 0), 0) : 0;
+  updateStats(rows.length, fields.length, numeric, total);
   populateLabelColSelect();
   renderAllCharts();
   hideLoadingOverlay();
@@ -290,205 +209,156 @@ function parseCSV(text, name) {
   Papa.parse(text, {
     header: true, dynamicTyping: false, skipEmptyLines: true,
     complete: ({ data: rows, meta }) => {
-      if (!rows.length) { 
-        showToast('No data found in file.', 'error');
-        hideLoadingOverlay();
-        return;
-      }
+      if (!rows.length) { showToast('No data found.', 'error'); hideLoadingOverlay(); return; }
       processRows(rows, meta.fields, name);
     },
-    error: () => {
-      showToast('Failed to parse CSV.', 'error');
-      hideLoadingOverlay();
-    }
+    error: () => { showToast('Failed to parse CSV.', 'error'); hideLoadingOverlay(); }
   });
 }
-
 function parseExcel(buffer, name) {
   try {
-    const wb   = XLSX.read(buffer, { type: 'array' });
-    const ws   = wb.Sheets[wb.SheetNames[0]];
+    const wb = XLSX.read(buffer, { type: 'array' }), ws = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
-    if (!rows.length) { 
-      showToast('No data found in file.', 'error');
-      hideLoadingOverlay();
-      return;
-    }
+    if (!rows.length) { showToast('No data found.', 'error'); hideLoadingOverlay(); return; }
     processRows(rows, Object.keys(rows[0] || {}), name);
-  } catch {
-    showToast('Failed to parse Excel file.', 'error');
-    hideLoadingOverlay();
-  }
+  } catch { showToast('Failed to parse Excel.', 'error'); hideLoadingOverlay(); }
 }
-
 async function loadServerFile(fileInfo) {
-  if (!fileInfo || !fileInfo.url) {
-    showToast('File information is missing.', 'error');
-    hideLoadingOverlay();
-    return;
-  }
-
+  if (!fileInfo?.url) { showToast('File information missing.', 'error'); hideLoadingOverlay(); return; }
   try {
     showLoadingOverlay();
-    console.log('Loading file from:', fileInfo.url);
-    const resp = await fetch(fileInfo.url, { 
-      credentials: 'include',
-      method: 'GET',
-      headers: { 'Accept': '*/*' }
-    });
-
-    if (!resp.ok) {
-      throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
-    }
-
-    const contentType = resp.headers.get('content-type') || '';
+    const resp = await fetch(fileInfo.url, { credentials: 'include', method: 'GET', headers: { 'Accept': '*/*' } });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const name = fileInfo.name || 'data';
     const ext  = name.split('.').pop().toLowerCase();
-
-    if (contentType.includes('application/json')) {
-      const json = await resp.json();
-      throw new Error(json.error || 'Server returned JSON error');
-    }
-
     if (ext === 'csv' || ext === 'txt') {
       const text = await resp.text();
-      if (!text || text.trim().length === 0) {
-        throw new Error('File is empty');
-      }
+      if (!text?.trim()) throw new Error('File is empty');
       parseCSV(text, name);
     } else if (ext === 'xlsx' || ext === 'xls') {
       const buf = await resp.arrayBuffer();
-      if (!buf || buf.byteLength === 0) {
-        throw new Error('File is empty or not readable');
-      }
+      if (!buf?.byteLength) throw new Error('File empty');
       parseExcel(new Uint8Array(buf), name);
     } else {
-      try {
-        const buf = await resp.arrayBuffer();
-        parseExcel(new Uint8Array(buf), name);
-      } catch {
-        const text = await resp.text();
-        parseCSV(text, name);
-      }
+      try { parseExcel(new Uint8Array(await resp.arrayBuffer()), name); }
+      catch { parseCSV(await resp.text(), name); }
     }
-  } catch (error) {
-    console.error('File load error:', error);
-    showToast(`Could not load file: ${error.message}`, 'error');
-    hideLoadingOverlay();
-  }
+  } catch(e) { showToast(`Could not load file: ${e.message}`, 'error'); hideLoadingOverlay(); }
 }
 
 function showToast(msg, type = 'info') {
   document.querySelectorAll('.dc-toast').forEach(el => el.remove());
-  const t = document.createElement('div');
-  t.className = 'dc-toast';
-  const isDark = state.theme === 'dark';
+  const t = document.createElement('div'); t.className = 'dc-toast';
+  const dk = state.theme === 'dark';
   t.style.cssText = `
-    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
-    background:${type === 'error' ? (isDark ? '#7f1d1d' : '#fef2f2') : (isDark ? '#1e3a8a' : '#dbeafe')};
-    color:${type === 'error' ? (isDark ? '#fca5a5' : '#991b1b') : (isDark ? '#bfdbfe' : '#1e3a8a')};
-    border:1px solid ${type === 'error' ? (isDark ? '#991b1b' : '#fca5a5') : (isDark ? '#1d4ed8' : '#3b82f6')};
-    border-radius:8px; padding:10px 18px; font-size:13px;
-    box-shadow:0 4px 24px rgba(0,0,0,0.5); z-index:9999;
-    font-family:'IBM Plex Sans',sans-serif;
-  `;
-  t.textContent = msg;
-  document.body.appendChild(t);
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+    background:${type === 'error' ? (dk ? '#7f1d1d' : '#fef2f2') : (dk ? '#1e3a8a' : '#dbeafe')};
+    color:${type === 'error' ? (dk ? '#fca5a5' : '#991b1b') : (dk ? '#bfdbfe' : '#1e3a8a')};
+    border:1px solid ${type === 'error' ? (dk ? '#991b1d' : '#fca5a5') : (dk ? '#1d4ed8' : '#3b82f6')};
+    border-radius:8px;padding:10px 18px;font-size:13px;
+    box-shadow:0 4px 24px rgba(0,0,0,0.5);z-index:9999;
+    font-family:'IBM Plex Sans',sans-serif;`;
+  t.textContent = msg; document.body.appendChild(t);
   setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 0.4s'; setTimeout(() => t.remove(), 400); }, 4000);
 }
 
 function showDashboard() {
-  const noFile = document.getElementById('no-file-screen');
-  const db     = document.getElementById('dashboard-screen');
-  if (noFile) noFile.classList.add('hidden');
-  db.classList.remove('hidden');
-  db.classList.add('visible');
-
-  const btn = document.getElementById('btn-download-all');
-  if (btn) btn.classList.remove('hidden');
-
+  document.getElementById('no-file-screen')?.classList.add('hidden');
+  const db = document.getElementById('dashboard-screen');
+  db.classList.remove('hidden'); db.classList.add('visible');
+  document.getElementById('btn-download-all')?.classList.remove('hidden');
   const badge = document.getElementById('filename-badge');
-  if (badge) {
-    badge.textContent = '/ ' + state.filename;
-    badge.classList.remove('hidden');
-  }
+  if (badge) { badge.textContent = '/ ' + state.filename; badge.classList.remove('hidden'); }
 }
 
-function updateStats(totalRows, displayRows, colCount, numeric) {
-  document.getElementById('stat-rows').textContent   = totalRows.toLocaleString();
-  document.getElementById('stat-cols').textContent   = colCount;
-  document.getElementById('stat-series').textContent = numeric.length;
-  
-  const total = numeric[0]
-    ? state.allRows.reduce((s, r) => s + Number(r[numeric[0]] || 0), 0)
-    : 0;
-  
+function updateStats(totalRows, colCount, numeric, total) {
+  document.getElementById('stat-rows').textContent        = totalRows.toLocaleString();
+  document.getElementById('stat-cols').textContent        = colCount;
+  document.getElementById('stat-series').textContent      = numeric.length;
   document.getElementById('stat-total').textContent       = fmtNum(total);
   document.getElementById('stat-total-label').textContent = (numeric[0] || 'Value') + ' Total';
-  
-  const statsPanel = document.getElementById('stats-panel');
-  if (statsPanel && displayRows < totalRows) {
-    let infoEl = document.getElementById('display-info');
-    if (!infoEl) {
-      infoEl = document.createElement('div');
-      infoEl.id = 'display-info';
-      infoEl.style.cssText = `
-        color: #94a3b8; font-size: 11px; margin-top: 8px; padding-top: 8px;
-        border-top: 1px solid #334155;
-      `;
-      statsPanel.appendChild(infoEl);
-    }
-    infoEl.textContent = `Displaying top ${displayRows.toLocaleString()} of ${totalRows.toLocaleString()} rows`;
-  }
 }
 
+// Global GROUP / LABEL — starts blank, user selects once to override ALL charts
 function populateLabelColSelect() {
   const sel = document.getElementById('label-col-select');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— select column —</option>';
+  state.headers.forEach(h => {
+    const opt = document.createElement('option');
+    opt.value = h; opt.textContent = h;
+    sel.appendChild(opt);
+  });
+  sel.value = '';
+  sel.onchange = null;
+  sel.onchange = () => {
+    if (!sel.value) return;
+    // Override every chart's displayCol with the global pick
+    CHART_TYPES.forEach(t => { state.charts[t].displayCol = sel.value; });
+    showLoadingOverlay();
+    setTimeout(() => { renderAllCharts(); hideLoadingOverlay(); }, 600);
+  };
+}
+
+// Per-chart FILTER BY COLUMN — changes only that chart's displayCol
+function buildFilterPanel(type) {
+  const sel = document.getElementById('filter-col-' + type);
+  if (!sel) return;
+
+  const current = state.charts[type].displayCol;
   sel.innerHTML = '';
   state.headers.forEach(h => {
     const opt = document.createElement('option');
     opt.value = h; opt.textContent = h;
-    if (h === state.labelCol) opt.selected = true;
+    if (h === current) opt.selected = true;
     sel.appendChild(opt);
   });
+
+  sel.onchange = null;
+  sel.onchange = () => {
+    state.charts[type].displayCol = sel.value;
+    updateFilterBadge(type);
+    state.chartsToRender.add(type);
+    debounceRender();
+  };
+
+  updateFilterBadge(type);
+}
+
+function updateFilterBadge(type) {
+  const badge      = document.getElementById('badge-filter-' + type);
+  const displayCol = state.charts[type].displayCol;
+  if (!badge) return;
+  if (displayCol) {
+    badge.textContent = displayCol;
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
+  }
 }
 
 function getChartDefaults() {
-  const isDark = state.theme === 'dark';
+  const dk = state.theme === 'dark';
   return {
-    animation: false,
-    animations: false,
-    responsive: true,
-    maintainAspectRatio: true,
+    animation: false, animations: false,
+    responsive: true, maintainAspectRatio: false, resizeDelay: 100,
     layout: { padding: 0 },
+    interaction: { mode: 'index', intersect: false, axis: 'x' },
     plugins: {
-      legend: { 
+      legend: {
         display: true,
-        labels: { 
-          color: isDark ? '#64748b' : '#475569', 
-          font: { size: 10, weight: '500' },
-          padding: 12,
-          usePointStyle: true,
-          boxWidth: 6
-        } 
+        labels: { color: dk ? '#64748b' : '#475569', font: { size: 10, weight: '500' }, padding: 12, usePointStyle: true, boxWidth: 6 }
       },
       tooltip: {
-        enabled: true,
-        backgroundColor: isDark ? '#1e293b' : '#ffffff',
-        borderColor: isDark ? '#334155' : '#e2e8f0',
-        borderWidth: 1,
-        titleColor: isDark ? '#f1f5f9' : '#0f172a',
-        bodyColor: isDark ? '#94a3b8' : '#475569',
-        titleFont: { size: 11, weight: '600' },
-        bodyFont: { size: 10 },
-        padding: 8,
-        displayColors: true,
-        boxPadding: 4,
+        enabled: true, mode: 'index', intersect: false,
+        backgroundColor: dk ? '#1e293b' : '#ffffff',
+        borderColor: dk ? '#475569' : '#cbd5e1', borderWidth: 1,
+        titleColor: dk ? '#f1f5f9' : '#0f172a', bodyColor: dk ? '#94a3b8' : '#475569',
+        titleFont: { size: 11, weight: '600', family: "'IBM Plex Sans',sans-serif" },
+        bodyFont:  { size: 11, family: "'IBM Plex Sans',sans-serif" },
+        padding: 12, displayColors: true, boxPadding: 4, caretSize: 6,
         callbacks: {
-          title: ctx => {
-            const label = ctx[0]?.label ?? '';
-            return Array.isArray(label) ? label.join(' ') : String(label).slice(0, 20);
-          },
+          title: ctx => wrapLabel(ctx[0]?.label ?? '', 44),
           label: ctx => '  ' + ctx.dataset.label + ': ' + Number(ctx.raw).toLocaleString()
         }
       }
@@ -497,443 +367,463 @@ function getChartDefaults() {
       x: {
         display: true,
         ticks: {
-          color: isDark ? '#475569' : '#64748b',
-          font: { size: 8 },
-          maxRotation: 45,
-          minRotation: 0,
-          autoSkipPadding: 20,
-          callback: function(val) {
-            const label = this.getLabelForValue(val);
-            return label.length > 12 ? label.slice(0, 12) + '…' : label;
-          }
+          color: dk ? '#475569' : '#64748b', font: { size: 8 },
+          maxRotation: 45, minRotation: 0, autoSkipPadding: 20,
+          callback: function(val) { const l = this.getLabelForValue(val); return l.length > 14 ? l.slice(0, 14) + '…' : l; }
         },
-        grid: { color: isDark ? '#1e3a5f' : '#e2e8f0', drawBorder: false }
+        grid: { color: dk ? '#1e3a5f' : '#e2e8f0', drawBorder: false }
       },
       y: {
         display: true,
-        ticks: { 
-          color: isDark ? '#475569' : '#64748b', 
-          font: { size: 9 }, 
-          callback: v => fmtTick(v)
-        },
-        grid: { color: isDark ? '#1e3a5f' : '#e2e8f0', drawBorder: false }
+        ticks: { color: dk ? '#475569' : '#64748b', font: { size: 9 }, callback: v => fmtTick(v) },
+        grid: { color: dk ? '#1e3a5f' : '#e2e8f0', drawBorder: false }
       }
     }
   };
+}
+
+function lockCanvasHeight(canvas, height) {
+  canvas.style.height = height + 'px';
+  const w = canvas.parentElement;
+  if (w) { w.style.position = 'relative'; w.style.height = height + 'px'; }
 }
 
 function renderChart(type) {
   const canvas = document.getElementById('canvas-' + type);
   const cs     = state.charts[type];
-
   if (!canvas) return;
 
-  // PIE CHART - USE FIXED DATA, NEVER FILTER
+  const groupCol    = cs.displayCol || state.headers.find(h => !state.numericCols.includes(h)) || state.headers[0];
+  const visibleKeys = cs.activeKeys.filter(k => state.numericCols.includes(k));
+  let agg           = aggregateByLabel(state.allRows, groupCol, state.numericCols);
+
+  const entryBadge = document.getElementById('badge-entries-' + type);
+
   if (type === 'pie') {
-    const entryBadge = document.getElementById('badge-entries-' + type);
-    if (entryBadge) {
-      entryBadge.textContent = state.pieData.length + ' entries';
-    }
+    const pieCol    = cs.activeKeys[0] || state.numericCols[0];
+    const pieSorted = agg
+      .map(r => ({ name: String(r[groupCol] ?? ''), value: Number(r[pieCol] ?? 0) }))
+      .filter(d => d.value > 0)
+      .sort((a, b) => b.value - a.value);
 
-    const filtBadge = document.getElementById('badge-filtered-' + type);
-    if (filtBadge) {
-      filtBadge.classList.add('hidden');
-    }
+    let slices = pieSorted.slice(0, MAX_PIE_SLICES);
+    const rem  = pieSorted.slice(MAX_PIE_SLICES);
+    if (rem.length) slices.push({ name: `Other (${rem.length})`, value: rem.reduce((s, d) => s + d.value, 0) });
 
-    if (cs.instance) { 
-      cs.instance.destroy(); 
-      cs.instance = null;
-    }
-    
-    if (!state.pieData || !state.pieData.length) return;
+    if (entryBadge) entryBadge.textContent = slices.length + ' entries';
+    if (cs.instance) { cs.instance.destroy(); cs.instance = null; }
+    if (!slices.length) return;
 
-    const defaults = getChartDefaults();
-    const isDark = state.theme === 'dark';
-
-    const config = {
+    const dk = state.theme === 'dark';
+    lockCanvasHeight(canvas, 280);
+    cs.instance = new Chart(canvas, {
       type: 'doughnut',
       data: {
-        labels:   state.pieData.map(d => d.name),
+        labels: slices.map(d => d.name),
         datasets: [{
-          data:            state.pieData.map(d => d.value),
-          backgroundColor: PALETTE.slice(0, state.pieData.length),
-          borderWidth: 2,
-          borderColor: isDark ? '#1e293b' : '#ffffff'
+          data: slices.map(d => d.value),
+          backgroundColor: PALETTE.slice(0, slices.length),
+          borderWidth: 2, borderColor: dk ? '#1e293b' : '#ffffff'
         }]
       },
       options: {
-        responsive: true,
-        maintainAspectRatio: true,
-        animation: false,
-        animations: false,
+        responsive: true, maintainAspectRatio: false, resizeDelay: 100, animation: false, animations: false,
+        layout: { padding: { right: 10 } },
         plugins: {
-          ...defaults.plugins,
           legend: {
-            ...defaults.plugins.legend,
-            position: 'right',
+            display: true, position: 'right',
             labels: {
-              ...defaults.plugins.legend.labels,
+              color: dk ? '#64748b' : '#475569', font: { size: 10 }, padding: 12, usePointStyle: true, boxWidth: 6,
               generateLabels: chart => chart.data.labels.map((label, i) => ({
-                text: label.length > 25 ? label.slice(0, 25) + '…' : label,
-                fillStyle: PALETTE[i % PALETTE.length],
-                strokeStyle: isDark ? '#1e293b' : '#ffffff',
-                lineWidth: 2,
-                index: i
+                text: String(label), fillStyle: PALETTE[i % PALETTE.length],
+                strokeStyle: dk ? '#1e293b' : '#ffffff', lineWidth: 2, index: i
               }))
+            }
+          },
+          tooltip: {
+            enabled: true,
+            backgroundColor: dk ? '#1e293b' : '#ffffff', borderColor: dk ? '#475569' : '#cbd5e1', borderWidth: 1,
+            titleColor: dk ? '#f1f5f9' : '#0f172a', bodyColor: dk ? '#94a3b8' : '#475569',
+            titleFont: { size: 11, weight: '600' }, bodyFont: { size: 11 }, padding: 12,
+            callbacks: {
+              title: ctx => wrapLabel(ctx[0]?.label ?? '', 36),
+              label: ctx => {
+                const val   = Number(ctx.raw);
+                const total = ctx.chart.data.datasets[0].data.reduce((s, v) => s + Number(v), 0);
+                const pct   = total > 0 ? ((val / total) * 100).toFixed(1) : '0.0';
+                return '  ' + pieCol + ': ' + val.toLocaleString() + '  (' + pct + '%)';
+              }
             }
           }
         }
       }
-    };
-
-    cs.instance = new Chart(canvas, config);
+    });
     return;
   }
 
-  // OTHER CHARTS - USE FILTERED DATA
-  const visibleKeys = cs.activeKeys.filter(k => state.numericCols.includes(k));
-  let agg = aggregateByLabel(cs.filteredRows, state.labelCol, state.numericCols);
-  
   if (agg.length > MAX_CHART_POINTS) {
     const step = Math.ceil(agg.length / MAX_CHART_POINTS);
     agg = agg.filter((_, i) => i % step === 0).slice(0, MAX_CHART_POINTS);
   }
 
-  const entryBadge = document.getElementById('badge-entries-' + type);
-  if (entryBadge) {
-    entryBadge.textContent = agg.length + ' entries';
-  }
-
-  const filtBadge = document.getElementById('badge-filtered-' + type);
-  if (filtBadge) {
-    if (cs.filteredRows.length < state.displayRows.length) {
-      filtBadge.textContent = cs.filteredRows.length.toLocaleString() + ' rows';
-      filtBadge.classList.remove('hidden');
-    } else {
-      filtBadge.classList.add('hidden');
-    }
-  }
-
-  if (cs.instance) { 
-    cs.instance.destroy(); 
-    cs.instance = null;
-  }
-  
+  if (entryBadge) entryBadge.textContent = agg.length + ' entries';
+  if (cs.instance) { cs.instance.destroy(); cs.instance = null; }
   if (!visibleKeys.length || !agg.length) return;
 
-  const labels = agg.map(r => String(r[state.labelCol] ?? ''));
+  const labels   = agg.map(r => String(r[groupCol] ?? ''));
   const defaults = getChartDefaults();
-  const isDark = state.theme === 'dark';
+  const dk       = state.theme === 'dark';
   let config;
 
-  if (type === 'area') {
-    const datasets = visibleKeys.map((k, i) => {
-      const color = PALETTE[i % PALETTE.length];
-      return { 
-        label: k, 
-        data: agg.map(r => r[k]),
-        backgroundColor: color + '15',
-        borderColor: color,
-        borderWidth: 1.5,
-        fill: true,
-        tension: 0.2,
-        pointRadius: 0,
-        pointHoverRadius: 4,
-        pointBackgroundColor: color,
-        clip: false
-      };
-    });
-
+  if (type === 'line') {
     config = {
       type: 'line',
-      data: { labels, datasets },
-      options: {
-        ...defaults,
-        plugins: defaults.plugins,
-        scales: defaults.scales
-      }
+      data: {
+        labels,
+        datasets: visibleKeys.map((k, i) => {
+          const color = PALETTE[i % PALETTE.length];
+          return {
+            label: k, data: agg.map(r => r[k]),
+            borderColor: color, backgroundColor: color + '30', borderWidth: 2,
+            fill: false, tension: 0.3,
+            pointRadius: 3, pointHoverRadius: 7,
+            pointBackgroundColor: color,
+            pointBorderColor: dk ? '#1e293b' : '#ffffff', pointBorderWidth: 2,
+            pointHoverBackgroundColor: color,
+            pointHoverBorderColor: dk ? '#f1f5f9' : '#0f172a', pointHoverBorderWidth: 2,
+            clip: false
+          };
+        })
+      },
+      options: { ...defaults }
     };
-  } else if (type === 'line') {
-    const datasets = visibleKeys.map((k, i) => {
-      const color = PALETTE[i % PALETTE.length];
-      return { 
-        label: k, 
-        data: agg.map(r => r[k]),
-        borderColor: color,
-        backgroundColor: 'transparent',
-        borderWidth: 1.5,
-        fill: false,
-        tension: 0.2,
-        pointRadius: 0,
-        pointHoverRadius: 5,
-        pointBackgroundColor: color,
-        pointBorderColor: color,
-        clip: false
-      };
-    });
-
+  } else if (type === 'area') {
     config = {
       type: 'line',
-      data: { labels, datasets },
-      options: {
-        ...defaults,
-        plugins: defaults.plugins,
-        scales: defaults.scales
-      }
+      data: {
+        labels,
+        datasets: visibleKeys.map((k, i) => {
+          const color = PALETTE[i % PALETTE.length];
+          return {
+            label: k, data: agg.map(r => r[k]),
+            backgroundColor: color + '35', borderColor: color, borderWidth: 2,
+            fill: 'origin', tension: 0.3,
+            pointRadius: 3, pointHoverRadius: 7,
+            pointBackgroundColor: color,
+            pointBorderColor: dk ? '#1e293b' : '#ffffff', pointBorderWidth: 2,
+            pointHoverBackgroundColor: color,
+            pointHoverBorderColor: dk ? '#f1f5f9' : '#0f172a', pointHoverBorderWidth: 2,
+            clip: false
+          };
+        })
+      },
+      options: { ...defaults, plugins: { ...defaults.plugins, filler: { propagate: false } } }
     };
   } else {
-    const datasets = visibleKeys.map((k, i) => {
-      const color = PALETTE[i % PALETTE.length];
-      return { 
-        label: k, 
-        data: agg.map(r => r[k]),
-        backgroundColor: color + 'bb', 
-        borderRadius: 2,
-        borderColor: 'transparent',
-        borderWidth: 0
-      };
-    });
-
     config = {
       type: 'bar',
-      data: { labels, datasets },
-      options: {
-        ...defaults,
-        plugins: defaults.plugins,
-        scales: defaults.scales,
-        barPercentage: 0.7,
-        categoryPercentage: 0.8
-      }
+      data: {
+        labels,
+        datasets: visibleKeys.map((k, i) => {
+          const color = PALETTE[i % PALETTE.length];
+          return {
+            label: k, data: agg.map(r => r[k]),
+            backgroundColor: color + 'bb', hoverBackgroundColor: color,
+            borderRadius: 2, borderColor: 'transparent', borderWidth: 0
+          };
+        })
+      },
+      options: { ...defaults, barPercentage: 0.7, categoryPercentage: 0.8 }
     };
   }
 
+  lockCanvasHeight(canvas, 260);
   cs.instance = new Chart(canvas, config);
-}
-
-function buildFilterPanel(type) {
-  const sel = document.getElementById('filter-col-' + type);
-  if (!sel) return;
-  
-  sel.innerHTML = '<option value="">— none —</option>';
-  state.headers
-    .filter(h => h !== state.labelCol && !state.numericCols.includes(h))
-    .forEach(h => {
-      const opt = document.createElement('option');
-      opt.value = h; opt.textContent = h;
-      sel.appendChild(opt);
-    });
-  sel.value = state.charts[type].filterCol || '';
-  
-  sel.onchange = null;
-  sel.onchange = () => {
-    const col = sel.value;
-    state.charts[type].filterCol = col;
-    state.charts[type].filterVal = '';
-    populateFilterVals(type, col);
-    
-    // Only re-render THIS chart type
-    state.chartsToRender.add(type);
-    debounceRender();
-  };
-}
-
-function populateFilterVals(type, col) {
-  const valSel   = document.getElementById('filter-val-' + type);
-  const clearBtn = document.getElementById('filter-clear-' + type);
-  
-  if (!valSel || !clearBtn) return;
-  
-  if (!col) {
-    valSel.classList.add('hidden');
-    clearBtn.classList.add('hidden');
-    valSel.onchange = null;
-    clearBtn.onclick = null;
-    return;
-  }
-  
-  valSel.classList.remove('hidden');
-  clearBtn.classList.remove('hidden');
-  
-  const unique = [...new Set(state.displayRows.map(r => String(r[col] ?? '').trim()))]
-    .filter(Boolean).sort().slice(0, 500);
-  
-  valSel.innerHTML = '<option value="">All values</option>';
-  unique.forEach(v => {
-    const opt = document.createElement('option');
-    opt.value = v;
-    opt.textContent = v.length > 30 ? v.slice(0, 30) + '…' : v;
-    valSel.appendChild(opt);
-  });
-  
-  valSel.value = state.charts[type].filterVal || '';
-  
-  valSel.onchange = null;
-  valSel.onchange = () => {
-    state.charts[type].filterVal = valSel.value;
-    applyFilter(type);
-    
-    state.chartsToRender.add(type);
-    debounceRender();
-  };
-  
-  clearBtn.onclick = null;
-  clearBtn.onclick = () => {
-    state.charts[type].filterCol = '';
-    state.charts[type].filterVal = '';
-    document.getElementById('filter-col-' + type).value = '';
-    valSel.classList.add('hidden');
-    clearBtn.classList.add('hidden');
-    state.charts[type].filteredRows = [...state.displayRows];
-    
-    state.chartsToRender.add(type);
-    debounceRender();
-  };
-}
-
-function applyFilter(type) {
-  const { filterCol, filterVal } = state.charts[type];
-  let filtered = state.displayRows;
-  if (filterCol && filterVal) {
-    filtered = state.displayRows.filter(r => String(r[filterCol] ?? '').trim() === filterVal);
-  }
-  state.charts[type].filteredRows = filtered;
 }
 
 function buildSeriesPanel(type) {
   const container = document.getElementById('series-toggles-' + type);
   if (!container) return;
-  
   container.innerHTML = '';
   const cs = state.charts[type];
-  
   state.numericCols.forEach((k, i) => {
     const color  = PALETTE[i % PALETTE.length];
     const active = cs.activeKeys.includes(k);
     const btn    = document.createElement('button');
-    btn.className         = 'series-btn' + (active ? ' active' : '');
-    btn.textContent       = k;
-    btn.dataset.key       = k;
-    btn.dataset.type      = type;
+    btn.className   = 'series-btn' + (active ? ' active' : '');
+    btn.textContent = k; btn.dataset.key = k; btn.dataset.type = type;
     btn.style.borderColor = active ? color : (state.theme === 'dark' ? '#334155' : '#cbd5e1');
-    btn.style.color       = active ? color : (state.theme === 'dark' ? '#64748b' : '#64748b');
+    btn.style.color       = active ? color : '#64748b';
     btn.style.background  = active ? color + '20' : 'transparent';
-    
-    btn.onclick = (e) => {
+    btn.onclick = e => {
       e.stopPropagation();
       const idx = cs.activeKeys.indexOf(k);
-      if (idx >= 0) cs.activeKeys.splice(idx, 1);
-      else          cs.activeKeys.push(k);
-      const isNowActive     = cs.activeKeys.includes(k);
-      btn.style.borderColor = isNowActive ? color : (state.theme === 'dark' ? '#334155' : '#cbd5e1');
-      btn.style.color       = isNowActive ? color : (state.theme === 'dark' ? '#64748b' : '#64748b');
-      btn.style.background  = isNowActive ? color + '20' : 'transparent';
-      
+      if (idx >= 0) cs.activeKeys.splice(idx, 1); else cs.activeKeys.push(k);
+      const on = cs.activeKeys.includes(k);
+      btn.style.borderColor = on ? color : (state.theme === 'dark' ? '#334155' : '#cbd5e1');
+      btn.style.color       = on ? color : '#64748b';
+      btn.style.background  = on ? color + '20' : 'transparent';
       state.chartsToRender.add(type);
       debounceRender();
     };
-    
     container.appendChild(btn);
   });
 }
 
+async function aiFixChart(type) {
+  const btn = document.getElementById('ai-btn-' + type);
+  if (!btn || !state.allRows.length) return;
+
+  const origHTML    = btn.innerHTML;
+  btn.disabled      = true;
+  btn.innerHTML     = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 0.8s linear infinite"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg> Thinking…`;
+  btn.style.opacity = '0.6';
+
+  const sampleRows = state.allRows.slice(0, 5);
+  const nonNumeric = state.headers.filter(h => !state.numericCols.includes(h));
+
+  const prompt = `You are a data visualization expert. Pick the best display column for a ${type} chart.
+
+Current display column: "${state.charts[type].displayCol}"
+All columns: ${JSON.stringify(state.headers)}
+Numeric columns: ${JSON.stringify(state.numericCols)}
+Non-numeric columns: ${JSON.stringify(nonNumeric)}
+Sample rows: ${JSON.stringify(sampleRows)}
+
+Pick the best non-numeric column to group/display this ${type} chart by on the X-axis.
+For line/area prefer date/time. For bar prefer short category. For pie prefer few unique values.
+
+Respond ONLY with valid JSON, no markdown:
+{"displayCol":"<column name>","reason":"<one short sentence>"}`;
+
+  try {
+    const resp   = await fetch('ai_fix.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt }) });
+    const data   = await resp.json();
+    if (data.error) throw new Error(data.error);
+    const clean  = (data.text || '').trim().replace(/```json|```/g, '').trim();
+    const result = JSON.parse(clean);
+
+    if (result.displayCol && state.headers.includes(result.displayCol)) {
+      state.charts[type].displayCol = result.displayCol;
+      buildFilterPanel(type);
+      buildSeriesPanel(type);
+      renderChart(type);
+      buildChartNote(type);
+      const panel = document.getElementById('filter-panel-' + type);
+      if (panel) panel.classList.remove('hidden');
+      showToast(`AI set ${type}: grouped by "${result.displayCol}". ${result.reason}`, 'info');
+    } else {
+      showToast('AI returned an unrecognized column. Try again.', 'error');
+    }
+  } catch(e) {
+    console.error('AI fix error:', e);
+    showToast('AI fix failed. Check console.', 'error');
+  }
+
+  btn.disabled      = false;
+  btn.innerHTML     = origHTML;
+  btn.style.opacity = '';
+}
+
 function downloadChartPNG(type, filename) {
-  const canvas = document.getElementById('canvas-' + type);
-  if (!canvas) return;
+  const canvas = document.getElementById('canvas-' + type); if (!canvas) return;
   const link   = document.createElement('a');
-  link.download = filename || type + '-chart.png';
-  link.href     = canvas.toDataURL('image/png');
-  link.click();
+  link.download = filename || type + '-chart.png'; link.href = canvas.toDataURL('image/png'); link.click();
 }
 
 function downloadAll() {
-  CHART_TYPES.forEach((type, i) => {
-    setTimeout(() => downloadChartPNG(type, type + '-chart.png'), i * 400);
+  showDownloadModal();
+}
+
+function showDownloadModal() {
+  document.getElementById('dc-download-modal')?.remove();
+  const dk  = state.theme === 'dark';
+  const modal = document.createElement('div');
+  modal.id = 'dc-download-modal';
+  modal.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);
+    display:flex;align-items:center;justify-content:center;z-index:9999;`;
+  modal.innerHTML = `
+    <div style="
+      background:${dk?'#1e293b':'#ffffff'};border:1px solid ${dk?'#334155':'#e2e8f0'};
+      border-radius:14px;padding:28px 32px;min-width:320px;max-width:420px;width:90%;
+      box-shadow:0 20px 60px rgba(0,0,0,0.4);font-family:'IBM Plex Sans',sans-serif;">
+      <div style="font-size:15px;font-weight:700;color:${dk?'#f1f5f9':'#0f172a'};margin-bottom:6px;">Download Charts</div>
+      <div style="font-size:12px;color:${dk?'#64748b':'#94a3b8'};margin-bottom:22px;">Choose how you want to export the charts.</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button id="dl-combined" style="
+          padding:12px 16px;border-radius:8px;border:1px solid #3b82f6;
+          background:#3b82f620;color:#3b82f6;font-size:13px;font-weight:600;
+          cursor:pointer;text-align:left;transition:background 0.15s;">
+          🖼️ &nbsp;Single image — all 4 charts combined
+        </button>
+        <button id="dl-individual" style="
+          padding:12px 16px;border-radius:8px;border:1px solid ${dk?'#334155':'#cbd5e1'};
+          background:transparent;color:${dk?'#94a3b8':'#475569'};font-size:13px;font-weight:600;
+          cursor:pointer;text-align:left;transition:background 0.15s;">
+          📁 &nbsp;Individual files — one PNG per chart
+        </button>
+        <button id="dl-cancel" style="
+          padding:10px 16px;border-radius:8px;border:none;
+          background:transparent;color:${dk?'#475569':'#94a3b8'};font-size:12px;
+          cursor:pointer;margin-top:4px;">
+          Cancel
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  modal.querySelector('#dl-combined').onclick   = () => { modal.remove(); downloadCombined(); };
+  modal.querySelector('#dl-individual').onclick = () => { modal.remove(); CHART_TYPES.forEach((t,i) => setTimeout(() => downloadChartPNG(t, t+'-chart.png'), i*400)); };
+  modal.querySelector('#dl-cancel').onclick     = () => modal.remove();
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+}
+
+async function downloadCombined() {
+  const COLS = 2, GAP = 20, PAD = 24, LABEL_H = 32;
+  const canvases = CHART_TYPES.map(t => document.getElementById('canvas-' + t)).filter(Boolean);
+  if (!canvases.length) return;
+
+  const cw = canvases[0].width  || canvases[0].offsetWidth  || 600;
+  const ch = canvases[0].height || canvases[0].offsetHeight || 300;
+  const ROWS = Math.ceil(canvases.length / COLS);
+  const dk   = state.theme === 'dark';
+
+  const totalW = COLS * cw + (COLS - 1) * GAP + PAD * 2;
+  const totalH = ROWS * (ch + LABEL_H) + (ROWS - 1) * GAP + PAD * 2 + 40;
+
+  const out = document.createElement('canvas');
+  out.width  = totalW;
+  out.height = totalH;
+  const ctx  = out.getContext('2d');
+
+  ctx.fillStyle = dk ? '#0f172a' : '#f8fafc';
+  ctx.fillRect(0, 0, totalW, totalH);
+
+  // header
+  ctx.fillStyle = dk ? '#f1f5f9' : '#0f172a';
+  ctx.font      = 'bold 15px IBM Plex Sans, sans-serif';
+  ctx.fillText('DataChart — ' + (state.filename || 'export'), PAD, PAD + 16);
+
+  canvases.forEach((canvas, i) => {
+    const col  = i % COLS;
+    const row  = Math.floor(i / COLS);
+    const x    = PAD + col * (cw + GAP);
+    const y    = PAD + 40 + row * (ch + LABEL_H + GAP);
+    const type = CHART_TYPES[i];
+    const col_ = state.charts[type]?.displayCol || '';
+
+    // chart label
+    ctx.fillStyle = dk ? '#64748b' : '#94a3b8';
+    ctx.font      = '600 11px IBM Plex Sans, sans-serif';
+    const label   = type.charAt(0).toUpperCase() + type.slice(1) + ' Chart' + (col_ ? '  ·  ' + col_ : '');
+    ctx.fillText(label, x, y + 14);
+
+    // border
+    ctx.strokeStyle = dk ? '#1e3a5f' : '#e2e8f0';
+    ctx.lineWidth   = 1;
+    ctx.beginPath();
+    ctx.roundRect(x - 1, y + LABEL_H - 1, cw + 2, ch + 2, 6);
+    ctx.stroke();
+
+    ctx.drawImage(canvas, x, y + LABEL_H, cw, ch);
   });
+
+  const link     = document.createElement('a');
+  link.download  = 'datachart-all.png';
+  link.href      = out.toDataURL('image/png');
+  link.click();
+}
+
+// Build and inject the per-chart info note showing defaults, current state, and guidance
+function buildChartNote(type) {
+  const noteId  = 'chart-note-' + type;
+  let note      = document.getElementById(noteId);
+  const canvas  = document.getElementById('canvas-' + type);
+  if (!canvas) return;
+  
+  const chartCard = canvas.closest('.bg-slate-800');
+  if (!chartCard) return;
+
+  if (!note) {
+    note    = document.createElement('div');
+    note.id = noteId;
+    note.style.cssText = `
+      margin-top:10px;padding:10px 12px;border-radius:6px;font-size:11px;line-height:1.5;
+      font-family:'IBM Plex Sans',sans-serif;
+      background:rgba(59,130,246,0.08);
+      border:1px solid rgba(59,130,246,0.18);
+      color:#94a3b8;`;
+    chartCard.appendChild(note);
+  }
+
+  const cs      = state.charts[type];
+  const current = cs.displayCol || '—';
+  const def     = CHART_DEFAULTS[type] || '—';
+  const isDef   = current === def || (current.toLowerCase() === def.toLowerCase());
+  
+  // Type-specific guidance
+  let typeGuide = '';
+  if (type === 'line') {
+    typeGuide = 'Line: best for trends over time or sequences.';
+  } else if (type === 'bar') {
+    typeGuide = 'Bar: best for comparing categories.';
+  } else if (type === 'area') {
+    typeGuide = 'Area: best for stacked trends and cumulative changes.';
+  } else if (type === 'pie') {
+    typeGuide = 'Pie: best for showing composition and proportions.';
+  }
+
+  // Data limits info
+  const dataLimitNote = type === 'pie' 
+    ? `up to <b>${MAX_PIE_SLICES}</b> slices`
+    : `up to <b>${MAX_CHART_POINTS}</b> data points`;
+
+  // Current vs default status
+  const currentStatus = isDef 
+    ? `<span style="color:#10b981;font-weight:600;">${current}</span> (default)`
+    : `<span style="color:#f1f5f9;font-weight:600;">${current}</span> (default: ${def})`;
+
+  note.innerHTML = `
+    <div style="margin-bottom:6px;">
+      <span style="color:#3b82f6;font-weight:600;">Default column:</span> ${currentStatus}
+    </div>
+    <div style="opacity:0.8;">
+      ${typeGuide}
+    </div>`;
 }
 
 function toggleTheme() {
   state.theme = state.theme === 'dark' ? 'light' : 'dark';
   localStorage.setItem('dc-theme', state.theme);
   document.documentElement.setAttribute('data-theme', state.theme);
-  
-  if (state.allRows.length > 0) {
-    CHART_TYPES.forEach(type => renderChart(type));
-  }
+  if (state.allRows.length > 0) CHART_TYPES.forEach(type => renderChart(type));
 }
 
 document.addEventListener('DOMContentLoaded', () => {
   initializeLoadingOverlay();
-  
   document.documentElement.setAttribute('data-theme', state.theme);
 
-  const themeBtn = document.getElementById('theme-toggle');
-  if (themeBtn) {
-    themeBtn.addEventListener('click', toggleTheme);
-  }
-
-  const labelColSelect = document.getElementById('label-col-select');
-  if (labelColSelect) {
-    labelColSelect.addEventListener('change', e => {
-      state.labelCol = e.target.value;
-      CHART_TYPES.forEach(t => {
-        state.charts[t].filteredRows = [...state.displayRows];
-        state.charts[t].filterCol   = '';
-        state.charts[t].filterVal   = '';
-      });
-      showLoadingOverlay();
-      setTimeout(() => {
-        renderAllCharts();
-        hideLoadingOverlay();
-      }, 600);
-    });
-  }
-
-  const btnAll = document.getElementById('btn-download-all');
-  if (btnAll) {
-    btnAll.addEventListener('click', downloadAll);
-  }
+  document.getElementById('theme-toggle')?.addEventListener('click', toggleTheme);
+  document.getElementById('btn-download-all')?.addEventListener('click', downloadAll);
 
   document.addEventListener('click', e => {
-    if (state.isRendering) {
-      e.preventDefault();
-      e.stopPropagation();
-      return false;
-    }
-    
-    const btn = e.target.closest('[data-action]');
-    if (!btn) return;
-    
+    if (state.isRendering) { e.preventDefault(); e.stopPropagation(); return false; }
+    const btn    = e.target.closest('[data-action]'); if (!btn) return;
     const type   = btn.dataset.type;
     const action = btn.dataset.action;
 
     if (action === 'filter') {
       e.preventDefault();
-      const panel  = document.getElementById('filter-panel-' + type);
-      if (!panel) return;
-      
+      const panel = document.getElementById('filter-panel-' + type); if (!panel) return;
       const isOpen = !panel.classList.contains('hidden');
       panel.classList.toggle('hidden', isOpen);
-      btn.classList.toggle('border-brand-500', !isOpen);
-      btn.classList.toggle('text-blue-300', !isOpen);
-      btn.classList.toggle('bg-blue-950', !isOpen);
-      
-      if (!isOpen) {
-        buildFilterPanel(type);
-        buildSeriesPanel(type);
-        if (state.charts[type].filterCol) {
-          populateFilterVals(type, state.charts[type].filterCol);
-        }
-      }
+      if (!isOpen) { buildFilterPanel(type); buildSeriesPanel(type); buildChartNote(type); }
     }
-
-    if (action === 'download') {
-      e.preventDefault();
-      downloadChartPNG(type);
-    }
+    if (action === 'download') { e.preventDefault(); downloadChartPNG(type); }
+    if (action === 'ai') { e.preventDefault(); aiFixChart(type); }
   }, true);
 
   const DC = window.DATACHART;
-  if (DC && DC.activeFile) {
-    loadServerFile(DC.activeFile);
-  }
+  if (DC?.activeFile) loadServerFile(DC.activeFile);
 });

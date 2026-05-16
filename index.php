@@ -334,7 +334,7 @@ if (loggedIn()) {
 <section class="hero">
   <div class="hero-badge"><span></span> Role-based data platform</div>
   <h1>Turn data into<br><em>clear decisions</em></h1>
-  <p>Upload CSV files, visualise insights in seconds, and control exactly who sees what — with admin, staff, and boss-level access.</p>
+  <p>Upload CSV files, visualise insights in seconds, and control exactly who sees what.</p>
   <div class="hero-actions">
     <a href="register.php" class="btn-hero-primary">Request access →</a>
     <a href="login.php" class="btn-hero-secondary">Sign in</a>

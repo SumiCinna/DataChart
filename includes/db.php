@@ -108,3 +108,5 @@ function auditLog(string $action, string $detail = ''): void {
                 ->execute([$u['id'] ?? null, $action, $detail]);
     } catch (Throwable $e) { /* non-fatal */ }
 }
+
+define('GEMINI_API_KEY', 'AIzaSyBTT8lh-IwskP6jkcf_ZyfUVOB29R1-BJQ');
