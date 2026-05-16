@@ -9,14 +9,6 @@ const CHART_TYPES = ['line','bar','area','pie'];
 const MAX_CHART_POINTS = 30;
 const MAX_PIE_SLICES   = 10;
 
-// Default display column per chart type — falls back if column doesn't exist in data
-const CHART_DEFAULTS = {
-  line: 'Contractor_1',
-  bar:  'FY',
-  area: 'Location',
-  pie:  'Region',
-};
-
 const state = {
   allRows:     [],
   headers:     [],
@@ -34,16 +26,46 @@ const state = {
   }
 };
 
-// Pick the best default column for a chart type from available headers
+// Intelligently pick the best column for each chart type based on actual data
 function resolveDefault(type) {
-  const preferred = CHART_DEFAULTS[type];
   const nonNumeric = state.headers.filter(h => !state.numericCols.includes(h));
-  // exact match first
-  if (preferred && state.headers.includes(preferred)) return preferred;
-  // case-insensitive match
-  const ci = nonNumeric.find(h => h.toLowerCase() === (preferred || '').toLowerCase());
-  if (ci) return ci;
-  // fallback: first non-numeric col
+  
+  if (nonNumeric.length === 0) {
+    // Fallback: if no non-numeric columns, use first column
+    return state.headers[0] || '';
+  }
+  
+  // Type-specific smart selection
+  if (type === 'line') {
+    // Prefer date/time-like columns for line charts
+    const dateKeywords = ['date', 'time', 'month', 'year', 'period', 'fy'];
+    const dateCol = nonNumeric.find(h => dateKeywords.some(k => h.toLowerCase().includes(k)));
+    return dateCol || nonNumeric[0];
+  }
+  
+  if (type === 'bar') {
+    // Prefer shorter category columns for bar charts
+    const shortCol = nonNumeric.find(h => h.length < 15);
+    return shortCol || nonNumeric[0];
+  }
+  
+  if (type === 'area') {
+    // Prefer location/category columns for area
+    const categoryKeywords = ['location', 'region', 'category', 'type', 'department'];
+    const catCol = nonNumeric.find(h => categoryKeywords.some(k => h.toLowerCase().includes(k)));
+    return catCol || nonNumeric[0];
+  }
+  
+  if (type === 'pie') {
+    // Prefer columns with few unique values for pie
+    const uniqueCounts = nonNumeric.map(col => ({
+      col,
+      unique: new Set(state.allRows.map(r => r[col])).size
+    }));
+    const fewUnique = uniqueCounts.find(({ unique }) => unique <= 10);
+    return fewUnique?.col || nonNumeric[0];
+  }
+  
   return nonNumeric[0] || state.headers[0] || '';
 }
 
@@ -759,8 +781,6 @@ function buildChartNote(type) {
 
   const cs      = state.charts[type];
   const current = cs.displayCol || '—';
-  const def     = CHART_DEFAULTS[type] || '—';
-  const isDef   = current === def || (current.toLowerCase() === def.toLowerCase());
   
   // Type-specific guidance
   let typeGuide = '';
@@ -774,19 +794,9 @@ function buildChartNote(type) {
     typeGuide = 'Pie: best for showing composition and proportions.';
   }
 
-  // Data limits info
-  const dataLimitNote = type === 'pie' 
-    ? `up to <b>${MAX_PIE_SLICES}</b> slices`
-    : `up to <b>${MAX_CHART_POINTS}</b> data points`;
-
-  // Current vs default status
-  const currentStatus = isDef 
-    ? `<span style="color:#10b981;font-weight:600;">${current}</span> (default)`
-    : `<span style="color:#f1f5f9;font-weight:600;">${current}</span> (default: ${def})`;
-
   note.innerHTML = `
     <div style="margin-bottom:6px;">
-      <span style="color:#3b82f6;font-weight:600;">Default column:</span> ${currentStatus}
+      <span style="color:#3b82f6;font-weight:600;">Column:</span> <span style="color:#f1f5f9;font-weight:600;">${current}</span>
     </div>
     <div style="opacity:0.8;">
       ${typeGuide}
