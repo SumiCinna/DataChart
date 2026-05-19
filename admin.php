@@ -75,7 +75,7 @@ $active = $pdo->query(
 $token = csrfToken();
 ?>
 <!DOCTYPE html>
-<html lang="en" class="bg-slate-950">
+<html lang="en" class="bg-white">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -95,10 +95,10 @@ $token = csrfToken();
   </script>
   <link rel="stylesheet" href="css/admin.css" />
 </head>
-<body class="min-h-screen bg-slate-950 text-slate-100 font-sans">
+<body class="min-h-screen bg-white text-black font-sans">
 
   <!-- Navbar -->
-  <header class="sticky top-5 z-50 border-b border-slate-800 bg-slate-950/95 backdrop-blur-sm">
+  <header class="sticky top-5 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
     <div class="max-w-5xl mx-auto px-6 h-13 flex items-center gap-3">
       <div class="w-6 h-6 rounded-md bg-brand-600 flex items-center justify-center flex-shrink-0">
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none">

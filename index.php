@@ -35,14 +35,14 @@ if (loggedIn()) {
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     :root {
-      --bg:      #020817;
-      --surface: #0f172a;
-      --border:  #1e293b;
-      --border2: #334155;
-      --text:    #f1f5f9;
-      --muted:   #64748b;
-      --accent:  #3b82f6;
-      --accent2: #2563eb;
+      --bg:      #ffffff;
+      --surface: #f8fafc;
+      --border:  #e2e8f0;
+      --border2: #cbd5e1;
+      --text:    #0f172a;
+      --muted:   #475569;
+      --accent:  #2563eb;
+      --accent2: #1d4ed8;
     }
 
     html { scroll-behavior: smooth; }

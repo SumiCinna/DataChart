@@ -74,7 +74,7 @@ $token = csrfToken();
   </script>
   <link rel="stylesheet" href="css/auth.css" />
 </head>
-<body class="min-h-screen bg-slate-950 text-slate-100 font-sans flex items-center justify-center p-4">
+<body class="min-h-screen bg-white text-black font-sans flex items-center justify-center p-4">
 
   <div class="auth-card w-full max-w-sm">
     <!-- Logo -->
@@ -86,7 +86,7 @@ $token = csrfToken();
           <rect x="9" y="1" width="2.5" height="11" fill="white" rx="0.5"/>
         </svg>
       </div>
-      <span class="font-bold text-lg tracking-tight text-slate-100">DataChart</span>
+      <span class="font-bold text-lg tracking-tight" style="color:#0f172a">DataChart</span>
     </a>
 
     <h1 class="text-2xl font-extrabold tracking-tight mb-1">Welcome back</h1>

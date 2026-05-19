@@ -91,24 +91,33 @@ $token = csrfToken();
   <style>
     .name-grid   { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .name-grid-3 { display: grid; grid-template-columns: 1fr 0.75fr 1fr; gap: 10px; }
+
+    /* Page-specific overrides to ensure white+blue palette */
+    .bg-slate-950 { background: #ffffff !important; }
+    .text-slate-100 { color: #0f172a !important; }
+    .text-slate-500 { color: #475569 !important; }
+    .text-slate-600 { color: #64748b !important; }
+    .text-blue-500 { color: #2563eb !important; }
+    .hover\:text-blue-400:hover { color: #1d4ed8 !important; }
+    .bg-blue-600 { background: #2563eb !important; }
   </style>
 </head>
-<body class="min-h-screen bg-slate-950 text-slate-100 font-sans flex items-center justify-center p-4">
+<body class="min-h-screen bg-white text-black font-sans flex items-center justify-center p-4">
 
   <div class="auth-card w-full" style="max-width:440px">
     <!-- Logo -->
     <a href="index.php" class="flex items-center gap-3 mb-8" style="text-decoration:none">
-      <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0">
+      <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0" style="background:#2563eb">
         <svg width="16" height="16" viewBox="0 0 13 13" fill="none">
           <rect x="1" y="6" width="2.5" height="6" fill="white" rx="0.5"/>
           <rect x="5" y="3.5" width="2.5" height="8.5" fill="white" rx="0.5"/>
           <rect x="9" y="1" width="2.5" height="11" fill="white" rx="0.5"/>
         </svg>
       </div>
-      <span class="font-bold text-lg tracking-tight text-slate-100">DataChart</span>
+      <span class="font-bold text-lg tracking-tight" style="color:#0f172a">DataChart</span>
     </a>
 
-    <h1 class="text-2xl font-extrabold tracking-tight mb-1">Request access</h1>
+    <h1 class="text-2xl font-extrabold tracking-tight mb-1" style="color:#0f172a">Request access</h1>
     <p class="text-slate-500 text-sm mb-7">An admin will approve your account before you can sign in.</p>
 
     <?php if (!empty($errors)): ?>

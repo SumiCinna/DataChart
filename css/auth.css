@@ -5,12 +5,14 @@
 body {
   font-family: 'IBM Plex Sans', sans-serif;
   -webkit-font-smoothing: antialiased;
+  background: #ffffff;
+  color: #0f172a;
 }
 
 /* Auth card */
 .auth-card {
-  background: #0f172a;
-  border: 1px solid #1e293b;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 16px;
   padding: 2rem;
 }
@@ -21,18 +23,18 @@ body {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #64748b;
+  color: #475569;
   margin-bottom: 6px;
   font-weight: 600;
 }
 
 .field-input {
   width: 100%;
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 9px 12px;
-  color: #f1f5f9;
+  color: #0f172a;
   font-size: 13px;
   font-family: 'IBM Plex Sans', sans-serif;
   transition: border-color 0.15s;
@@ -40,11 +42,11 @@ body {
 }
 
 .field-input:focus {
-  border-color: #3b82f6;
+  border-color: #2563eb;
   box-shadow: 0 0 0 2px #2563eb33;
 }
 
-.field-input::placeholder { color: #475569; }
+.field-input::placeholder { color: #94a3b8; }
 
 select.field-input {
   cursor: pointer;
@@ -68,13 +70,13 @@ select.field-input {
   text-decoration: none;
 }
 
-.btn-primary:hover { background: #3b82f6; }
+.btn-primary:hover { background: #1d4ed8; }
 
 /* Alerts */
 .alert-error {
-  background: #1c0a0a;
-  border: 1px solid #7f1d1d;
-  color: #fca5a5;
+  background: #fff5f5;
+  border: 1px solid #fecaca;
+  color: #7f1d1d;
   border-radius: 8px;
   padding: 10px 14px;
   font-size: 12px;
@@ -82,9 +84,9 @@ select.field-input {
 }
 
 .alert-success {
-  background: #052e16;
-  border: 1px solid #14532d;
-  color: #86efac;
+  background: #ecfdf5;
+  border: 1px solid #bbf7d0;
+  color: #064e3b;
   border-radius: 8px;
   padding: 10px 14px;
   font-size: 12px;
@@ -104,7 +106,7 @@ select.field-input {
   display: flex;
   align-items: center;
 }
-.pw-toggle:hover { color: #94a3b8; }
+.pw-toggle:hover { color: #2563eb; }
 
 /* Demo creds */
 .demo-creds {
@@ -114,9 +116,9 @@ select.field-input {
 }
 
 .demo-btn {
-  background: #1e293b;
-  border: 1px solid #334155;
-  color: #94a3b8;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #475569;
   border-radius: 6px;
   padding: 4px 14px;
   font-size: 11px;
@@ -126,13 +128,13 @@ select.field-input {
 }
 
 .demo-btn:hover {
-  border-color: #3b82f6;
-  color: #93c5fd;
-  background: #172554;
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #e6f0ff;
 }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #0f172a; }
-::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #475569; }
+::-webkit-scrollbar-track { background: #ffffff; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #a8b3c3; }

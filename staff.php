@@ -85,7 +85,7 @@ function fmtSize(int $bytes): string {
 }
 ?>
 <!DOCTYPE html>
-<html lang="en" class="bg-slate-950">
+<html lang="en" class="bg-white">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -105,10 +105,10 @@ function fmtSize(int $bytes): string {
   </script>
   <link rel="stylesheet" href="css/admin.css" />
 </head>
-<body class="min-h-screen bg-slate-950 text-slate-100 font-sans">
+<body class="min-h-screen bg-white text-black font-sans">
 
   <!-- Navbar — flush to top, full width -->
-  <header class="sticky top-0 z-50 border-b border-slate-800 bg-slate-950/95 backdrop-blur-sm">
+  <header class="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
     <div class="max-w-5xl mx-auto px-6 h-14 flex items-center gap-3">
       <div class="w-6 h-6 rounded-md bg-brand-600 flex items-center justify-center flex-shrink-0">
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
@@ -144,7 +144,7 @@ function fmtSize(int $bytes): string {
         <input type="hidden" name="csrf_token" value="<?= $token ?>">
         <input type="hidden" name="action" value="upload">
         <div id="drop-zone-staff"
-          class="border-2 border-dashed border-slate-700 hover:border-brand-500 rounded-xl p-10 text-center cursor-pointer bg-slate-900 transition-all mb-3"
+          class="border-2 border-dashed border-slate-200 hover:border-brand-500 rounded-xl p-10 text-center cursor-pointer bg-white transition-all mb-3"
           onclick="document.getElementById('datafile').click()">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.5" class="mx-auto mb-3">
             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke-linecap="round" stroke-linejoin="round"/>
@@ -193,7 +193,7 @@ function fmtSize(int $bytes): string {
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.5" class="flex-shrink-0">
                         <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
                       </svg>
-                      <span class="font-medium text-slate-100 text-sm"><?= htmlspecialchars($f['original_name']) ?></span>
+                      <span class="font-medium text-black text-sm"><?= htmlspecialchars($f['original_name']) ?></span>
                     </div>
                   </td>
                   <td class="text-slate-400 text-xs"><?= fmtSize($f['file_size']) ?></td>
