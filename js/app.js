@@ -50,10 +50,13 @@ function resolveDefault(type) {
   }
   
   if (type === 'area') {
-    // Prefer location/category columns for area
-    const categoryKeywords = ['location', 'region', 'category', 'type', 'department'];
+    // Prefer location/category columns for area, but different from bar (which uses short columns)
+    // Try to use the second non-numeric column if available to differentiate from bar
+    const categoryKeywords = ['region', 'city', 'category', 'type', 'department', 'district'];
     const catCol = nonNumeric.find(h => categoryKeywords.some(k => h.toLowerCase().includes(k)));
-    return catCol || nonNumeric[0];
+    if (catCol && nonNumeric[0] !== catCol) return catCol;
+    // If only one non-numeric column, use it; otherwise use second if available
+    return nonNumeric.length > 1 ? nonNumeric[1] : nonNumeric[0];
   }
   
   if (type === 'pie') {
@@ -290,7 +293,7 @@ function showDashboard() {
   db.classList.remove('hidden'); db.classList.add('visible');
   document.getElementById('btn-download-all')?.classList.remove('hidden');
   const badge = document.getElementById('filename-badge');
-  if (badge) { badge.textContent = '/ ' + state.filename; badge.classList.remove('hidden'); }
+  if (badge) { badge.textContent = 'Active file: ' + state.filename; badge.classList.remove('hidden'); }
 }
 
 function updateStats(totalRows, colCount, numeric, total) {
@@ -695,14 +698,16 @@ function showDownloadModal() {
         <button id="dl-combined" style="
           padding:12px 16px;border-radius:8px;border:1px solid #3b82f6;
           background:#3b82f620;color:#3b82f6;font-size:13px;font-weight:600;
-          cursor:pointer;text-align:left;transition:background 0.15s;">
-          🖼️ &nbsp;Single image — all 4 charts combined
+          cursor:pointer;text-align:left;transition:background 0.15s;display:flex;align-items:center;gap:8px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L5 21"></path></svg>
+          Single image — all 4 charts combined
         </button>
         <button id="dl-individual" style="
           padding:12px 16px;border-radius:8px;border:1px solid ${dk?'#334155':'#cbd5e1'};
           background:transparent;color:${dk?'#94a3b8':'#475569'};font-size:13px;font-weight:600;
-          cursor:pointer;text-align:left;transition:background 0.15s;">
-          📁 &nbsp;Individual files — one PNG per chart
+          cursor:pointer;text-align:left;transition:background 0.15s;display:flex;align-items:center;gap:8px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+          ZIP archive — all 4 charts in one file
         </button>
         <button id="dl-cancel" style="
           padding:10px 16px;border-radius:8px;border:none;
@@ -715,7 +720,7 @@ function showDownloadModal() {
   document.body.appendChild(modal);
 
   modal.querySelector('#dl-combined').onclick   = () => { modal.remove(); downloadCombined(); };
-  modal.querySelector('#dl-individual').onclick = () => { modal.remove(); CHART_TYPES.forEach((t,i) => setTimeout(() => downloadChartPNG(t, t+'-chart.png'), i*400)); };
+  modal.querySelector('#dl-individual').onclick = () => { modal.remove(); downloadZip(); };
   modal.querySelector('#dl-cancel').onclick     = () => modal.remove();
   modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
 }
@@ -775,6 +780,41 @@ async function downloadCombined() {
   link.href      = out.toDataURL('image/png');
   link.click();
 }
+
+async function downloadZip() {
+  if (typeof JSZip === 'undefined') {
+    alert('ZIP library not available. Please try individual downloads instead.');
+    return;
+  }
+
+  const zip = new JSZip();
+  const chartFolder = zip.folder('DataChart Charts');
+  
+  // Add all 4 chart images to the ZIP
+  for (const type of CHART_TYPES) {
+    const canvas = document.getElementById('canvas-' + type);
+    if (!canvas) continue;
+    
+    // Convert canvas to blob and add to ZIP
+    const dataUrl = canvas.toDataURL('image/png');
+    const data = dataUrl.split(',')[1]; // Remove data:image/png;base64, prefix
+    chartFolder.file(type + '-chart.png', data, { base64: true });
+  }
+  
+  // Generate and download the ZIP
+  try {
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const link = document.createElement('a');
+    link.download = 'DataChart-Export.zip';
+    link.href = URL.createObjectURL(blob);
+    link.click();
+    URL.revokeObjectURL(link.href);
+  } catch (err) {
+    console.error('ZIP generation failed:', err);
+    alert('Failed to create ZIP file.');
+  }
+}
+
 
 // Build and inject the per-chart info note showing defaults, current state, and guidance
 function buildChartNote(type) {

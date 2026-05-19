@@ -98,8 +98,8 @@ $token = csrfToken();
 <body class="min-h-screen bg-white text-black font-sans">
 
   <!-- Navbar -->
-  <header class="sticky top-5 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
-    <div class="max-w-5xl mx-auto px-6 h-13 flex items-center gap-3">
+  <header id="navbar" class="sticky top-0 z-50 border-b border-transparent bg-brand-900 text-white backdrop-blur-sm">
+    <div class="max-w-6xl mx-auto px-7 py-3 flex items-center gap-3">
       <div class="w-6 h-6 rounded-md bg-brand-600 flex items-center justify-center flex-shrink-0">
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
           <rect x="1" y="6" width="2.5" height="6" fill="white" rx="0.5"/>
@@ -108,12 +108,12 @@ $token = csrfToken();
         </svg>
       </div>
       <span class="font-bold text-sm tracking-tight">DataChart</span>
-      <span class="text-slate-600 text-xs">/ Admin</span>
       <div class="ml-auto flex items-center gap-3">
         <span class="role-badge role-admin">Admin</span>
+        <span class="text-white text-xs hidden sm:inline"><?= htmlspecialchars($user['full_name']) ?></span>
         <a href="dashboard.php" class="nav-link-btn">Dashboard</a>
         <a href="staff.php" class="nav-link-btn">Files</a>
-        <a href="logout.php" class="nav-link-btn">Sign out</a>
+        <a href="logout.php" class="logout-trigger nav-link-btn">Sign out</a>
       </div>
     </div>
   </header>
@@ -267,6 +267,42 @@ $token = csrfToken();
     </div>
 
   </main>
+  <div id="logout-modal" class="hidden fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center px-4">
+    <div class="w-80 max-w-[90vw] rounded-xl border border-slate-200 bg-white p-5 shadow-2xl">
+      <h3 class="text-base font-bold text-slate-900 mb-2">Confirm Sign Out</h3>
+      <p class="text-sm text-slate-600 mb-5">Are you sure you want to sign out?</p>
+      <div class="flex gap-3">
+        <button id="logout-cancel-btn" type="button" class="flex-1 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+        <button id="logout-confirm-btn" type="button" class="flex-1 rounded-md border border-blue-600 bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Sign out</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const modal = document.getElementById('logout-modal');
+      const cancelBtn = document.getElementById('logout-cancel-btn');
+      const confirmBtn = document.getElementById('logout-confirm-btn');
+      const triggers = document.querySelectorAll('.logout-trigger');
+      let pendingHref = 'logout.php';
+
+      function closeModal() { modal?.classList.add('hidden'); }
+
+      triggers.forEach(link => {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          pendingHref = link.getAttribute('href') || 'logout.php';
+          modal?.classList.remove('hidden');
+        });
+      });
+
+      cancelBtn?.addEventListener('click', closeModal);
+      confirmBtn?.addEventListener('click', () => { window.location.href = pendingHref; });
+      modal?.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) closeModal();
+      });
+    })();
+  </script>
   <script src="js/admin.js"></script>
 </body>
 </html>

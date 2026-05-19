@@ -73,35 +73,36 @@ if (loggedIn()) {
     nav {
       position: fixed; top: 0; left: 0; right: 0; z-index: 50;
       backdrop-filter: blur(16px);
-      background: rgba(2,8,23,.7);
-      border-bottom: 1px solid var(--border);
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
       padding: 0 2rem;
       height: 60px;
       display: flex; align-items: center; justify-content: space-between;
     }
-    .nav-logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; letter-spacing: -.01em; }
+    .nav-logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; letter-spacing: -.01em; color: #ffffff; }
     .logo-icon {
       width: 32px; height: 32px; border-radius: 8px;
-      background: var(--accent2);
+      background: #2563eb;
       display: flex; align-items: center; justify-content: center;
       flex-shrink: 0;
     }
     .nav-links { display: flex; align-items: center; gap: 8px; }
     .nav-link {
-      color: #94a3b8; font-size: 13px; font-weight: 600;
+      color: rgba(255,255,255,.92); font-size: 13px; font-weight: 600;
       padding: 6px 14px; border-radius: 7px;
+      border: 1px solid transparent;
       text-decoration: none;
-      transition: color .15s, background .15s;
+      transition: color .15s, border-color .15s;
     }
-    .nav-link:hover { color: var(--text); background: var(--surface); }
+    .nav-link:hover { color: #fff; border-color: rgba(255,255,255,.2); }
     .nav-cta {
-      background: var(--accent2); color: #fff;
+      background: #2563eb; color: #fff;
       font-size: 13px; font-weight: 700;
       padding: 7px 18px; border-radius: 7px;
       text-decoration: none;
       transition: background .15s;
     }
-    .nav-cta:hover { background: var(--accent); }
+    .nav-cta:hover { background: #3b82f6; }
 
     /* ─── Hero ─── */
     .hero {
@@ -380,16 +381,25 @@ if (loggedIn()) {
   <div class="features-grid">
     <?php
     $features = [
-      ['📁', 'CSV Upload',        'Drag-and-drop CSV files. Instant parse and preview — no ETL pipeline needed.'],
-      ['📊', 'Live Charts',       'Bar, line, and pie charts auto-generated from your data columns.'],
-      ['🔐', 'Role-based Access', 'Admin, Staff, and Boss roles with granular visibility controls.'],
-      ['✅', 'Approval Workflow', 'New accounts require admin approval before accessing any data.'],
-      ['📋', 'Audit Log',         'Every login and action is logged so you always know who did what.'],
-      ['⚡', 'Fast & Lightweight','Pure PHP + MySQL — no framework overhead, deploys anywhere.'],
+      ['folder', 'CSV Upload',        'Drag-and-drop CSV files. Instant parse and preview — no ETL pipeline needed.'],
+      ['chart', 'Live Charts',       'Bar, line, and pie charts auto-generated from your data columns.'],
+      ['lock', 'Role-based Access', 'Admin, Staff, and Boss roles with granular visibility controls.'],
+      ['check', 'Approval Workflow', 'New accounts require admin approval before accessing any data.'],
+      ['clipboard', 'Audit Log',         'Every login and action is logged so you always know who did what.'],
+      ['zap', 'Fast & Lightweight','Pure PHP + MySQL — no framework overhead, deploys anywhere.'],
     ];
-    foreach ($features as $f): ?>
+    foreach ($features as $f): 
+      $icons = [
+        'folder'    => '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>',
+        'chart'     => '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="22"></line><path d="M17 5H9.5a1.5 1.5 0 0 0-1.5 1.5v12a1.5 1.5 0 0 0 1.5 1.5H17"></path><path d="M6 12H3m14 0h3"></path></svg>',
+        'lock'      => '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>',
+        'check'     => '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>',
+        'clipboard' => '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>',
+        'zap'       => '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>',
+      ];
+      ?>
       <div class="feature-card reveal">
-        <div class="feature-icon" style="font-size:18px;line-height:1"><?= $f[0] ?></div>
+        <div class="feature-icon" style="line-height:1;color:#3b82f6"><?= $icons[$f[0]] ?? $f[0] ?></div>
         <div class="feature-name"><?= $f[1] ?></div>
         <div class="feature-desc"><?= $f[2] ?></div>
       </div>
