@@ -214,7 +214,7 @@ select:focus {
 .filter-btn,
 .dl-btn {
   border: 1px solid var(--border-primary);
-  color: var(--text-secondary);
+  color: var(--text-primary) !important;
   background: var(--bg-secondary);
   border-radius: 6px;
   padding: 5px 14px;
@@ -324,4 +324,48 @@ select#filter-val-pie,
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
+}
+
+/* Ensure readable text on dark utility backgrounds (fix contrast after global body text change) */
+/* Target dark slate/blue utility classes used in templates and Tailwind items */
+[class*="bg-slate-9"], .bg-slate-900, .bg-slate-800, .bg-slate-950, .bg-blue-600, .bg-brand-600, .bg-brand-900 {
+  color: #ffffff !important;
+}
+
+[class*="bg-slate-9"] a, .bg-slate-900 a, .bg-slate-800 a, .bg-slate-950 a, .bg-blue-600 a, .bg-brand-600 a {
+  color: #ffffff !important;
+}
+
+/* Navbar/header specific fixes: force light text for dark headers */
+header[class*="bg-slate"], header[class*="bg-blue"], header[class*="bg-brand"] {
+  color: #ffffff;
+}
+header[class*="bg-slate"] .nav-link-btn, header[class*="bg-slate"] a, header[class*="bg-slate"] .role-badge {
+  color: #ffffff !important;
+}
+/* Ensure brand/dark-blue headers also show white links and badges */
+header[class*="bg-brand"] .nav-link-btn, header[class*="bg-brand"] a, header[class*="bg-brand"] .role-badge,
+header[class*="bg-blue"] .nav-link-btn, header[class*="bg-blue"] a, header[class*="bg-blue"] .role-badge {
+  color: #ffffff !important;
+}
+
+/* Buttons that use brand/background colors should show white text */
+.btn-primary { color: #ffffff !important; }
+
+/* Fix: readable text inside chart filter panels (dark panel used in some cards) */
+[id^="filter-panel-"] {
+  color: #ffffff !important;
+}
+[id^="filter-panel-"] p,
+[id^="filter-panel-"] .text-slate-500,
+[id^="filter-panel-"] label {
+  color: #e6eef8 !important;
+}
+[id^="filter-panel-"] .series-btn {
+  color: #0f172a !important;
+  background: #e6f0ff !important;
+  border-color: #cfe0ff !important;
+}
+[id^="filter-panel-"] select {
+  color: #0f172a !important;
 }

@@ -32,7 +32,7 @@ if ($activeFile) {
 }
 ?>
 <!DOCTYPE html>
-<html lang="en" class="bg-white">
+<html lang="en" data-theme="light" class="bg-white">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -58,7 +58,7 @@ if ($activeFile) {
 <body class="min-h-screen bg-white text-black font-sans m-0 p-0">
 
   <!-- ── NAVBAR ── -->
-  <header id="navbar" class="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
+  <header id="navbar" class="sticky top-0 z-50 border-b border-transparent bg-brand-900 text-white backdrop-blur-sm">
     <div class="max-w-6xl mx-auto px-7 py-3 flex items-center gap-3">
       <div class="w-6 h-6 rounded-md bg-brand-600 flex items-center justify-center flex-shrink-0">
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
@@ -68,7 +68,7 @@ if ($activeFile) {
         </svg>
       </div>
       <span class="font-bold text-sm tracking-tight">DataChart</span>
-      <span id="filename-badge" class="text-slate-600 text-xs ml-1 <?= $fileName ? '' : 'hidden' ?>">
+      <span id="filename-badge" class="text-white text-xs ml-1 <?= $fileName ? '' : 'hidden' ?>" style="opacity:.85">
         <?= $fileName ? '/ ' . $fileName : '' ?>
       </span>
 
@@ -76,7 +76,7 @@ if ($activeFile) {
         <span class="role-badge role-<?= $role ?>">
           <?= ucfirst($role) ?>
         </span>
-        <span class="text-slate-500 text-xs hidden sm:inline"><?= htmlspecialchars($user['full_name']) ?></span>
+        <span class="text-white text-xs hidden sm:inline"><?= htmlspecialchars($user['full_name']) ?></span>
 
         <?php if ($role === 'staff' || $role === 'admin'): ?>
           <a href="staff.php" class="nav-link-btn">Files</a>
@@ -88,7 +88,7 @@ if ($activeFile) {
         <button id="btn-download-all" class="hidden bg-brand-600 hover:bg-brand-500 transition-colors text-white text-xs font-semibold rounded-md px-4 py-1.5">
           Download All
         </button>
-        <a href="logout.php" class="border border-slate-200 hover:border-slate-300 text-slate-600 hover:text-slate-700 transition-colors text-xs rounded-md px-4 py-1.5">
+        <a href="logout.php" class="border border-transparent hover:border-white/20 text-white hover:text-white transition-colors text-xs rounded-md px-4 py-1.5">
           Sign out
         </a>
       </div>
@@ -143,9 +143,12 @@ if ($activeFile) {
       <!-- Controls bar -->
       <div class="bg-white rounded-lg border border-slate-200 p-3 mb-5 flex flex-wrap gap-4 items-center">
         <span class="text-slate-500 text-[11px] uppercase tracking-widest">Group / Label</span>
-        <select id="label-col-select"
-          class="bg-white border border-slate-200 text-black rounded-md px-3 py-1.5 text-xs focus:outline-none focus:border-brand-500">
-        </select>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="label-col-select"
+            class="bg-white border border-slate-200 text-black rounded-md px-3 py-1.5 text-xs focus:outline-none focus:border-brand-500">
+          </select>
+          <button id="label-clear-btn" class="filter-btn" type="button" title="Clear group/label selection">Clear</button>
+        </div>
         <span class="text-slate-700 text-xs hidden sm:inline">—</span>
         <span class="text-slate-500 text-xs hidden sm:inline">Charts are grouped and summed by this column.</span>
       </div>
@@ -165,7 +168,7 @@ if ($activeFile) {
               <div class="flex items-center gap-2 flex-wrap">
                 <span class="text-black font-semibold text-sm">{$label}</span>
                 <span id="badge-entries-{$type}" class="bg-white text-slate-500 text-[10px] px-2 py-0.5 rounded-full border border-slate-200">— entries</span>
-                <span id="badge-filtered-{$type}" class="hidden bg-blue-950 text-blue-300 text-[10px] px-2 py-0.5 rounded-full border border-blue-800"></span>
+                <span id="badge-filter-{$type}" class="hidden bg-blue-950 text-blue-300 text-[10px] px-2 py-0.5 rounded-full border border-blue-800"></span>
               </div>
               <div class="flex gap-2">
                 <button data-type="{$type}" data-action="filter"

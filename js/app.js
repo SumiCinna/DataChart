@@ -320,6 +320,25 @@ function populateLabelColSelect() {
     showLoadingOverlay();
     setTimeout(() => { renderAllCharts(); hideLoadingOverlay(); }, 600);
   };
+  // Wire up the Clear button next to the global select (if present)
+  const clearBtn = document.getElementById('label-clear-btn');
+  if (clearBtn) {
+    clearBtn.style.display = 'none';
+    clearBtn.onclick = () => {
+      sel.value = '';
+      // restore each chart's default display column
+      CHART_TYPES.forEach(t => { state.charts[t].displayCol = resolveDefault(t); state.chartsToRender.add(t); });
+      showLoadingOverlay();
+      setTimeout(() => { renderAllCharts(); hideLoadingOverlay(); }, 400);
+    };
+    // Show/hide when select changes
+    const origOnChange = sel.onchange;
+    sel.onchange = () => {
+      if (sel.value) clearBtn.style.display = 'inline-block';
+      else clearBtn.style.display = 'none';
+      if (origOnChange) origOnChange();
+    };
+  }
 }
 
 // Per-chart FILTER BY COLUMN — changes only that chart's displayCol
