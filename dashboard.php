@@ -150,7 +150,7 @@ if ($activeFile) {
           <select id="label-col-select"
             class="bg-white border border-slate-200 text-black rounded-md px-3 py-1.5 text-xs focus:outline-none focus:border-brand-500">
           </select>
-          <button id="label-clear-btn" class="filter-btn" type="button" title="Clear group/label selection">Clear</button>
+          <button id="label-clear-btn" class="filter-btn clear-btn" type="button" title="Clear group/label selection">Clear</button>
         </div>
         <span class="text-slate-700 text-xs hidden sm:inline">—</span>
         <span class="text-slate-500 text-xs hidden sm:inline">Charts are grouped and summed by this column.</span>
@@ -174,6 +174,28 @@ if ($activeFile) {
                 <span id="badge-filter-{$type}" class="hidden bg-blue-950 text-blue-300 text-[10px] px-2 py-0.5 rounded-full border border-blue-800"></span>
               </div>
               <div class="flex gap-2">
+                <select id="entries-limit-{$type}" class="bg-white border border-slate-200 text-slate-700 rounded-md px-2 py-1 text-[11px] focus:outline-none">
+                  <option value="5">Rows: 5</option>
+                  <option value="10">Rows: 10</option>
+                  <option value="15">Rows: 15</option>
+                  <option value="20">Rows: 20</option>
+                  <option value="25">Rows: 25</option>
+                  <option value="30" selected>Rows: 30</option>
+                </select>
+                <select id="sort-order-{$type}" class="bg-white border border-slate-200 text-slate-700 rounded-md px-2 py-1 text-[11px] focus:outline-none">
+                  <option value="default">Order: default</option>
+                  <option value="desc">Order: highest first</option>
+                  <option value="asc">Order: lowest first</option>
+                </select>
+                <select id="selection-mode-{$type}" class="bg-white border border-slate-200 text-slate-700 rounded-md px-2 py-1 text-[11px] focus:outline-none">
+                  <option value="current">Slice: current rows</option>
+                  <option value="top">Slice: top highest rows</option>
+                  <option value="bottom">Slice: bottom lowest rows</option>
+                </select>
+                <button data-type="{$type}" data-action="reset"
+                  class="reset-btn clear-btn border border-slate-200 text-slate-600 hover:text-slate-700 hover:border-brand-500 transition-colors rounded-md px-3 py-1 text-[11px]">
+                  Clear
+                </button>
                 <button data-type="{$type}" data-action="filter"
                   class="filter-btn border border-slate-200 text-slate-600 hover:text-slate-700 hover:border-brand-500 transition-colors rounded-md px-3 py-1 text-[11px]">
                   Filter
@@ -187,7 +209,7 @@ if ($activeFile) {
             <div id="filter-panel-{$type}" class="hidden px-4 py-3 bg-slate-950 border-b border-slate-700">
               <div class="flex flex-wrap gap-5 items-start">
                 <div>
-                  <p class="text-slate-500 text-[10px] uppercase tracking-widest mb-2">Filter by column</p>
+                  <p class="text-slate-500 text-[10px] uppercase tracking-widest mb-2">Filter by value (specific)</p>
                   <div class="flex gap-2 flex-wrap">
                     <select id="filter-col-{$type}" class="bg-white border border-slate-200 text-black rounded-md px-2 py-1 text-xs focus:outline-none">
                       <option value="">— none —</option>
@@ -195,7 +217,19 @@ if ($activeFile) {
                     <select id="filter-val-{$type}" class="hidden bg-white border border-brand-600 text-black rounded-md px-2 py-1 text-xs max-w-[180px] focus:outline-none">
                       <option value="">All values</option>
                     </select>
-                    <button id="filter-clear-{$type}" class="hidden border border-slate-700 text-slate-500 rounded-md px-2 py-1 text-[11px]">Clear</button>
+                    <select id="filter-col2-{$type}" class="hidden bg-white border border-slate-200 text-black rounded-md px-2 py-1 text-xs focus:outline-none">
+                      <option value="">More specific column</option>
+                    </select>
+                    <select id="filter-val2-{$type}" class="hidden bg-white border border-brand-600 text-black rounded-md px-2 py-1 text-xs max-w-[180px] focus:outline-none">
+                      <option value="">All values</option>
+                    </select>
+                    <select id="filter-col3-{$type}" class="hidden bg-white border border-slate-200 text-black rounded-md px-2 py-1 text-xs focus:outline-none">
+                      <option value="">Most specific column</option>
+                    </select>
+                    <select id="filter-val3-{$type}" class="hidden bg-white border border-brand-600 text-black rounded-md px-2 py-1 text-xs max-w-[180px] focus:outline-none">
+                      <option value="">All values</option>
+                    </select>
+                    <button id="filter-clear-{$type}" class="hidden clear-btn border border-slate-700 text-slate-500 rounded-md px-2 py-1 text-[11px]">Clear</button>
                   </div>
                 </div>
                 <div>
@@ -203,9 +237,26 @@ if ($activeFile) {
                   <div id="series-toggles-{$type}" class="flex flex-wrap gap-2"></div>
                 </div>
               </div>
+              <p id="filter-guide-{$type}" class="mt-2 text-[10px] text-slate-400">
+                Choose a top-level column and value, then refine with more specific columns.
+              </p>
             </div>
             <div class="p-4">
               <canvas id="canvas-{$type}" height="260"></canvas>
+            </div>
+            <div class="border-t border-slate-200">
+              <div class="px-4 py-2 flex items-center justify-between gap-3">
+                <p id="table-meta-{$type}" class="text-[11px] text-slate-500">No rows</p>
+                <button id="btn-download-table-{$type}" type="button" class="hidden border border-slate-200 text-slate-700 hover:text-slate-900 hover:border-brand-500 transition-colors rounded-md px-2.5 py-1 text-[11px] font-semibold">
+                  Download XLSX
+                </button>
+              </div>
+              <div class="max-h-44 overflow-auto">
+                <table class="min-w-full text-[11px]">
+                  <thead id="table-head-{$type}" class="sticky top-0 bg-slate-50"></thead>
+                  <tbody id="table-body-{$type}" class="divide-y divide-slate-100"></tbody>
+                </table>
+              </div>
             </div>
           </div>
 HTML;

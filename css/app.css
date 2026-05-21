@@ -230,6 +230,11 @@ select:focus {
   color: var(--text-primary);
 }
 
+.clear-btn,
+.clear-btn:hover {
+  background: transparent !important;
+}
+
 button {
   background: var(--bg-secondary);
   border: 1px solid var(--border-primary);

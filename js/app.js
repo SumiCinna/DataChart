@@ -8,21 +8,71 @@ const PALETTE = [
 const CHART_TYPES = ['line','bar','area','pie'];
 const MAX_CHART_POINTS = 30;
 const MAX_PIE_SLICES   = 10;
+const DEFAULT_ENTRY_LIMITS = {
+  line: 30,
+  bar: 25,
+  area: 20,
+  pie: 8,
+};
+
+const DEFAULT_SORT_ORDERS = {
+  line: 'default',
+  bar: 'default',
+  area: 'default',
+  pie: 'default',
+};
+
+const DEFAULT_SELECTION_MODES = {
+  line: 'current',
+  bar: 'current',
+  area: 'current',
+  pie: 'current',
+};
+
+const ENTRY_LIMIT_CHOICES = [5, 10, 15, 20, 25, 30];
+
+function getChartEntryCap(type, availableCount) {
+  const dataCap = Math.max(1, Number(availableCount) || 1);
+  const typeCap = type === 'pie' ? 10 : 30;
+  return Math.min(typeCap, dataCap);
+}
+
+function getChartEntryChoices(type, availableCount) {
+  const cap = getChartEntryCap(type, availableCount);
+  const choices = ENTRY_LIMIT_CHOICES.filter(n => n <= cap);
+  if (!choices.length || choices[choices.length - 1] !== cap) choices.push(cap);
+  return Array.from(new Set(choices)).sort((a, b) => a - b);
+}
+
+function updateEntryLimitSelect(type, availableCount, currentValue) {
+  const select = document.getElementById('entries-limit-' + type);
+  if (!select) return;
+
+  const choices = getChartEntryChoices(type, availableCount);
+  const nextValue = Math.min(
+    Math.max(1, Number(currentValue) || DEFAULT_ENTRY_LIMITS[type] || 30),
+    getChartEntryCap(type, availableCount)
+  );
+
+  select.innerHTML = choices.map(value => `<option value="${value}">${value} entries</option>`).join('');
+  select.value = String(choices.includes(nextValue) ? nextValue : choices[choices.length - 1]);
+}
 
 const state = {
   allRows:     [],
   headers:     [],
   numericCols: [],
   filename:    '',
+  chartTableRows: { line: [], bar: [], area: [], pie: [] },
   theme:       localStorage.getItem('dc-theme') || 'dark',
   isRendering: false,
   renderTimeout: null,
   chartsToRender: new Set(),
   charts: {
-    line: { instance: null, activeKeys: [], displayCol: '' },
-    bar:  { instance: null, activeKeys: [], displayCol: '' },
-    area: { instance: null, activeKeys: [], displayCol: '' },
-    pie:  { instance: null, activeKeys: [], displayCol: '' },
+    line: { instance: null, activeKeys: [], displayCol: '', filterCol: '', filterVal: '', filterCol2: '', filterVal2: '', filterCol3: '', filterVal3: '', entryLimit: 30, sortOrder: 'default', selectionMode: 'current', drillLabel: '' },
+    bar:  { instance: null, activeKeys: [], displayCol: '', filterCol: '', filterVal: '', filterCol2: '', filterVal2: '', filterCol3: '', filterVal3: '', entryLimit: 25, sortOrder: 'default', selectionMode: 'current', drillLabel: '' },
+    area: { instance: null, activeKeys: [], displayCol: '', filterCol: '', filterVal: '', filterCol2: '', filterVal2: '', filterCol3: '', filterVal3: '', entryLimit: 20, sortOrder: 'default', selectionMode: 'current', drillLabel: '' },
+    pie:  { instance: null, activeKeys: [], displayCol: '', filterCol: '', filterVal: '', filterCol2: '', filterVal2: '', filterCol3: '', filterVal3: '', entryLimit: 8, sortOrder: 'default', selectionMode: 'current', drillLabel: '' },
   }
 };
 
@@ -181,6 +231,128 @@ function aggregateByLabel(rows, labelCol, numericCols) {
   });
   return Array.from(map.values());
 }
+
+function normFilterVal(v) {
+  return String(v ?? '').trim();
+}
+
+function getUniqueValues(rows, col) {
+  if (!col) return [];
+  return Array.from(new Set(rows.map(r => normFilterVal(r[col])).filter(v => v !== ''))).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+}
+
+function getAggregateScore(row, numericKeys) {
+  return numericKeys.reduce((sum, key) => sum + Number(row[key] || 0), 0);
+}
+
+function sortChartRows(rows, type, numericKeys, sortOrder) {
+  const mode = sortOrder || 'default';
+  if (mode === 'default' || !rows.length) return rows.slice();
+
+  return rows.slice().sort((a, b) => {
+    const diff = getAggregateScore(a, numericKeys) - getAggregateScore(b, numericKeys);
+    return mode === 'asc' ? diff : -diff;
+  });
+}
+
+function getChartSourceRows(type, groupCol) {
+  const cs = state.charts[type];
+  let rows = applyChartFilters(type);
+  if (cs?.drillLabel && groupCol) {
+    const target = normFilterVal(cs.drillLabel);
+    rows = rows.filter(r => normFilterVal(r[groupCol]) === target);
+  }
+  return rows;
+}
+
+function selectChartRows(rows, entryLimit, selectionMode, numericKeys) {
+  const mode = selectionMode || 'current';
+  const limit = Math.max(1, Number(entryLimit) || 1);
+
+  if (!rows.length) return [];
+
+  if (mode === 'top' || mode === 'bottom') {
+    const ranked = rows.slice().sort((a, b) => {
+      const diff = getAggregateScore(a, numericKeys) - getAggregateScore(b, numericKeys);
+      return mode === 'top' ? -diff : diff;
+    });
+    return ranked.slice(0, limit);
+  }
+
+  return rows.slice(0, limit);
+}
+
+function setChartDrillLabel(type, label) {
+  const cs = state.charts[type];
+  if (!cs) return;
+  const nextLabel = String(label ?? '').trim();
+  cs.drillLabel = cs.drillLabel === nextLabel ? '' : nextLabel;
+  renderChart(type);
+}
+
+function resetChartState(type) {
+  const cs = state.charts[type];
+  if (!cs) return;
+
+  cs.filterCol = '';
+  cs.filterVal = '';
+  cs.filterCol2 = '';
+  cs.filterVal2 = '';
+  cs.filterCol3 = '';
+  cs.filterVal3 = '';
+  cs.sortOrder = DEFAULT_SORT_ORDERS[type] || 'default';
+  cs.selectionMode = DEFAULT_SELECTION_MODES[type] || 'current';
+  cs.entryLimit = DEFAULT_ENTRY_LIMITS[type] || 30;
+  cs.drillLabel = '';
+  cs.displayCol = resolveDefault(type);
+  cs.activeKeys = [...state.numericCols];
+
+  renderChart(type);
+  buildFilterPanel(type);
+  buildSeriesPanel(type);
+  buildChartNote(type);
+}
+
+function findHeaderByKeywords(keywords, exclude = []) {
+  const skip = new Set(exclude);
+  return state.headers.find(h => {
+    if (skip.has(h)) return false;
+    const low = String(h).toLowerCase();
+    return keywords.some(k => low.includes(k));
+  }) || '';
+}
+
+function getHierarchyHints() {
+  const level1 = findHeaderByKeywords(['region', 'province', 'state', 'district', 'area']);
+  const level2 = findHeaderByKeywords(['city', 'municipality', 'town'], [level1]);
+  const level3 = findHeaderByKeywords(['barangay', 'project', 'site', 'location', 'name'], [level1, level2]);
+
+  return {
+    level1: level1 || 'Region/Area',
+    level2: level2 || 'City/Municipality',
+    level3: level3 || 'Specific location/project'
+  };
+}
+
+function applyChartFilters(type, sourceRows = state.allRows) {
+  const cs = state.charts[type];
+  if (!cs) return sourceRows;
+
+  let out = sourceRows;
+  if (cs.filterCol && cs.filterVal) {
+    const v1 = normFilterVal(cs.filterVal);
+    out = out.filter(r => normFilterVal(r[cs.filterCol]) === v1);
+  }
+  if (cs.filterCol2 && cs.filterVal2) {
+    const v2 = normFilterVal(cs.filterVal2);
+    out = out.filter(r => normFilterVal(r[cs.filterCol2]) === v2);
+  }
+  if (cs.filterCol3 && cs.filterVal3) {
+    const v3 = normFilterVal(cs.filterVal3);
+    out = out.filter(r => normFilterVal(r[cs.filterCol3]) === v3);
+  }
+  return out;
+}
 function fmtNum(v) {
   if (v >= 1e9) return (v / 1e9).toFixed(2) + 'B';
   if (v >= 1e6) return (v / 1e6).toFixed(2) + 'M';
@@ -221,6 +393,17 @@ function processRows(rawRows, rawFields, name) {
   CHART_TYPES.forEach(t => {
     state.charts[t].activeKeys  = [...numeric];
     state.charts[t].displayCol  = resolveDefault(t);
+    state.charts[t].filterCol   = '';
+    state.charts[t].filterVal   = '';
+    state.charts[t].filterCol2  = '';
+    state.charts[t].filterVal2  = '';
+    state.charts[t].filterCol3  = '';
+    state.charts[t].filterVal3  = '';
+    state.charts[t].entryLimit  = DEFAULT_ENTRY_LIMITS[t] || 30;
+    state.charts[t].sortOrder   = DEFAULT_SORT_ORDERS[t] || 'default';
+    state.charts[t].selectionMode = DEFAULT_SELECTION_MODES[t] || 'current';
+    state.charts[t].drillLabel   = '';
+    state.chartTableRows[t]     = [];
   });
 
   const total = numeric[0] ? normalized.reduce((s, r) => s + Number(r[numeric[0]] || 0), 0) : 0;
@@ -344,23 +527,149 @@ function populateLabelColSelect() {
   }
 }
 
-// Per-chart FILTER BY COLUMN — changes only that chart's displayCol
+// Per-chart FILTER BY VALUE with three cascading levels
 function buildFilterPanel(type) {
-  const sel = document.getElementById('filter-col-' + type);
-  if (!sel) return;
+  const filterColSel = document.getElementById('filter-col-' + type);
+  const valSel       = document.getElementById('filter-val-' + type);
+  const col2Sel      = document.getElementById('filter-col2-' + type);
+  const val2Sel      = document.getElementById('filter-val2-' + type);
+  const col3Sel      = document.getElementById('filter-col3-' + type);
+  const val3Sel      = document.getElementById('filter-val3-' + type);
+  const clearBtn     = document.getElementById('filter-clear-' + type);
+  if (!filterColSel || !valSel || !col2Sel || !val2Sel || !col3Sel || !val3Sel || !clearBtn) return;
 
-  const current = state.charts[type].displayCol;
-  sel.innerHTML = '';
-  state.headers.forEach(h => {
-    const opt = document.createElement('option');
-    opt.value = h; opt.textContent = h;
-    if (h === current) opt.selected = true;
-    sel.appendChild(opt);
-  });
+  const cs = state.charts[type];
+  const hints = getHierarchyHints();
+  const guide = document.getElementById('filter-guide-' + type);
 
-  sel.onchange = null;
-  sel.onchange = () => {
-    state.charts[type].displayCol = sel.value;
+  const opt = (value, selected = false) => `<option value="${String(value).replace(/"/g, '&quot;')}"${selected ? ' selected' : ''}>${escHtml(value)}</option>`;
+
+  const primaryColOptions = [`<option value="">Level 1 column (e.g., ${escHtml(hints.level1)})</option>`].concat(
+    state.headers.map(h => opt(h, h === cs.filterCol))
+  );
+  filterColSel.innerHTML = primaryColOptions.join('');
+  valSel.classList.toggle('hidden', !cs.filterCol);
+
+  const secondaryCols = state.headers.filter(h => h !== cs.filterCol);
+  const secondaryColOptions = [`<option value="">Level 2 column (e.g., ${escHtml(hints.level2)})</option>`].concat(
+    secondaryCols.map(h => opt(h, h === cs.filterCol2))
+  );
+
+  col2Sel.classList.toggle('hidden', !cs.filterCol);
+  col2Sel.innerHTML = secondaryColOptions.join('');
+
+  const primaryValues = cs.filterCol ? getUniqueValues(state.allRows, cs.filterCol) : [];
+  valSel.innerHTML = `<option value="">All ${escHtml(cs.filterCol || hints.level1)}</option>` + primaryValues.map(v => opt(v, v === cs.filterVal)).join('');
+
+  const rowsAfterPrimary = cs.filterCol && cs.filterVal
+    ? state.allRows.filter(r => normFilterVal(r[cs.filterCol]) === normFilterVal(cs.filterVal))
+    : state.allRows;
+
+  const secondaryValues = cs.filterCol2 ? getUniqueValues(rowsAfterPrimary, cs.filterCol2) : [];
+  val2Sel.classList.toggle('hidden', !cs.filterCol2);
+  val2Sel.innerHTML = `<option value="">All ${escHtml(cs.filterCol2 || hints.level2)}</option>` + secondaryValues.map(v => opt(v, v === cs.filterVal2)).join('');
+
+  const tertiaryCols = state.headers.filter(h => h !== cs.filterCol && h !== cs.filterCol2);
+  const tertiaryColOptions = [`<option value="">Level 3 column (e.g., ${escHtml(hints.level3)})</option>`].concat(
+    tertiaryCols.map(h => opt(h, h === cs.filterCol3))
+  );
+  col3Sel.classList.toggle('hidden', !cs.filterCol2);
+  col3Sel.innerHTML = tertiaryColOptions.join('');
+
+  const rowsAfterSecondary = cs.filterCol2 && cs.filterVal2
+    ? rowsAfterPrimary.filter(r => normFilterVal(r[cs.filterCol2]) === normFilterVal(cs.filterVal2))
+    : rowsAfterPrimary;
+  const tertiaryValues = cs.filterCol3 ? getUniqueValues(rowsAfterSecondary, cs.filterCol3) : [];
+  val3Sel.classList.toggle('hidden', !cs.filterCol3);
+  val3Sel.innerHTML = `<option value="">All ${escHtml(cs.filterCol3 || hints.level3)}</option>` + tertiaryValues.map(v => opt(v, v === cs.filterVal3)).join('');
+
+  if (guide) {
+    guide.textContent = `1) Choose ${cs.filterCol || hints.level1}. 2) Narrow using ${cs.filterCol2 || hints.level2}. 3) Pick the most specific ${cs.filterCol3 || hints.level3}.`;
+  }
+
+  clearBtn.classList.toggle('hidden', !(cs.filterCol || cs.filterVal || cs.filterCol2 || cs.filterVal2 || cs.filterCol3 || cs.filterVal3));
+
+  filterColSel.onchange = null;
+  valSel.onchange = null;
+  col2Sel.onchange = null;
+  val2Sel.onchange = null;
+  col3Sel.onchange = null;
+  val3Sel.onchange = null;
+  clearBtn.onclick = null;
+
+  filterColSel.onchange = () => {
+    cs.filterCol = filterColSel.value;
+    cs.filterVal = '';
+    cs.filterCol2 = '';
+    cs.filterVal2 = '';
+    cs.filterCol3 = '';
+    cs.filterVal3 = '';
+    buildFilterPanel(type);
+    updateFilterBadge(type);
+    state.chartsToRender.add(type);
+    debounceRender();
+  };
+
+  valSel.onchange = () => {
+    cs.filterVal = valSel.value;
+    if (cs.filterCol2 && cs.filterVal2) {
+      const rowsScoped = cs.filterVal
+        ? state.allRows.filter(r => normFilterVal(r[cs.filterCol]) === normFilterVal(cs.filterVal))
+        : state.allRows;
+      const allowed = getUniqueValues(rowsScoped, cs.filterCol2);
+      if (!allowed.includes(cs.filterVal2)) cs.filterVal2 = '';
+    }
+    cs.filterVal3 = '';
+    buildFilterPanel(type);
+    updateFilterBadge(type);
+    state.chartsToRender.add(type);
+    debounceRender();
+  };
+
+  col2Sel.onchange = () => {
+    cs.filterCol2 = col2Sel.value;
+    cs.filterVal2 = '';
+    cs.filterCol3 = '';
+    cs.filterVal3 = '';
+    buildFilterPanel(type);
+    updateFilterBadge(type);
+    state.chartsToRender.add(type);
+    debounceRender();
+  };
+
+  val2Sel.onchange = () => {
+    cs.filterVal2 = val2Sel.value;
+    cs.filterVal3 = '';
+    buildFilterPanel(type);
+    updateFilterBadge(type);
+    state.chartsToRender.add(type);
+    debounceRender();
+  };
+
+  col3Sel.onchange = () => {
+    cs.filterCol3 = col3Sel.value;
+    cs.filterVal3 = '';
+    buildFilterPanel(type);
+    updateFilterBadge(type);
+    state.chartsToRender.add(type);
+    debounceRender();
+  };
+
+  val3Sel.onchange = () => {
+    cs.filterVal3 = val3Sel.value;
+    updateFilterBadge(type);
+    state.chartsToRender.add(type);
+    debounceRender();
+  };
+
+  clearBtn.onclick = () => {
+    cs.filterCol = '';
+    cs.filterVal = '';
+    cs.filterCol2 = '';
+    cs.filterVal2 = '';
+    cs.filterCol3 = '';
+    cs.filterVal3 = '';
+    buildFilterPanel(type);
     updateFilterBadge(type);
     state.chartsToRender.add(type);
     debounceRender();
@@ -371,10 +680,17 @@ function buildFilterPanel(type) {
 
 function updateFilterBadge(type) {
   const badge      = document.getElementById('badge-filter-' + type);
-  const displayCol = state.charts[type].displayCol;
+  const cs         = state.charts[type];
+  const displayCol = cs.displayCol;
   if (!badge) return;
-  if (displayCol) {
-    badge.textContent = displayCol;
+  const parts = [];
+  if (displayCol) parts.push('group: ' + displayCol);
+  if (cs.drillLabel) parts.push('clicked: ' + cs.drillLabel);
+  if (cs.filterCol && cs.filterVal) parts.push(cs.filterCol + ': ' + cs.filterVal);
+  if (cs.filterCol2 && cs.filterVal2) parts.push(cs.filterCol2 + ': ' + cs.filterVal2);
+  if (cs.filterCol3 && cs.filterVal3) parts.push(cs.filterCol3 + ': ' + cs.filterVal3);
+  if (parts.length) {
+    badge.textContent = parts.join(' | ');
     badge.classList.remove('hidden');
   } else {
     badge.classList.add('hidden');
@@ -437,9 +753,32 @@ function renderChart(type) {
   const cs     = state.charts[type];
   if (!canvas) return;
 
-  const groupCol    = cs.displayCol || state.headers.find(h => !state.numericCols.includes(h)) || state.headers[0];
+  const selectionSelect = document.getElementById('selection-mode-' + type);
+  if (selectionSelect && selectionSelect.value !== (cs.selectionMode || 'current')) {
+    selectionSelect.value = cs.selectionMode || 'current';
+  }
+
+  const groupCol      = cs.displayCol || state.headers.find(h => !state.numericCols.includes(h)) || state.headers[0];
+  const sourceRows    = getChartSourceRows(type, groupCol);
   const visibleKeys = cs.activeKeys.filter(k => state.numericCols.includes(k));
-  let agg           = aggregateByLabel(state.allRows, groupCol, state.numericCols);
+  let agg           = aggregateByLabel(sourceRows, groupCol, state.numericCols);
+  const availableCount = type === 'pie'
+    ? agg.filter(r => Number(r[cs.activeKeys[0] || state.numericCols[0]] || 0) > 0).length
+    : agg.length;
+  const entryLimit  = Math.max(1, Math.min(getChartEntryCap(type, availableCount), Number(cs.entryLimit) || DEFAULT_ENTRY_LIMITS[type] || 30));
+
+  cs.entryLimit = entryLimit;
+
+  updateEntryLimitSelect(type, availableCount, entryLimit);
+
+  const numericForSort = visibleKeys.length ? visibleKeys : (state.numericCols.length ? [state.numericCols[0]] : []);
+  agg = selectChartRows(agg, entryLimit, cs.selectionMode, numericForSort);
+
+  if (cs.sortOrder && cs.sortOrder !== 'default') {
+    agg = sortChartRows(agg, type, numericForSort, cs.sortOrder);
+  }
+
+  renderChartTable(type, sourceRows, entryLimit);
 
   const entryBadge = document.getElementById('badge-entries-' + type);
 
@@ -450,8 +789,11 @@ function renderChart(type) {
       .filter(d => d.value > 0)
       .sort((a, b) => b.value - a.value);
 
-    let slices = pieSorted.slice(0, MAX_PIE_SLICES);
-    const rem  = pieSorted.slice(MAX_PIE_SLICES);
+    let pieSlices = pieSorted.slice();
+    if (cs.sortOrder === 'asc') pieSlices = pieSlices.reverse();
+    const pieCap = Math.min(entryLimit, MAX_PIE_SLICES, pieSlices.length || 1);
+    let slices = pieSlices.slice(0, pieCap);
+    const rem  = pieSlices.slice(pieCap);
     if (rem.length) slices.push({ name: `Other (${rem.length})`, value: rem.reduce((s, d) => s + d.value, 0) });
 
     if (entryBadge) entryBadge.textContent = slices.length + ' entries';
@@ -505,9 +847,9 @@ function renderChart(type) {
     return;
   }
 
-  if (agg.length > MAX_CHART_POINTS) {
-    const step = Math.ceil(agg.length / MAX_CHART_POINTS);
-    agg = agg.filter((_, i) => i % step === 0).slice(0, MAX_CHART_POINTS);
+  if (agg.length > entryLimit) {
+    const step = Math.ceil(agg.length / entryLimit);
+    agg = agg.filter((_, i) => i % step === 0).slice(0, entryLimit);
   }
 
   if (entryBadge) entryBadge.textContent = agg.length + ' entries';
@@ -539,7 +881,15 @@ function renderChart(type) {
           };
         })
       },
-      options: { ...defaults }
+      options: {
+        ...defaults,
+        onClick: (event, elements, chart) => {
+          if (!elements?.length) return;
+          const index = elements[0].index;
+          const label = chart.data.labels?.[index];
+          if (label !== undefined) setChartDrillLabel(type, label);
+        }
+      }
     };
   } else if (type === 'area') {
     config = {
@@ -561,7 +911,16 @@ function renderChart(type) {
           };
         })
       },
-      options: { ...defaults, plugins: { ...defaults.plugins, filler: { propagate: false } } }
+      options: {
+        ...defaults,
+        plugins: { ...defaults.plugins, filler: { propagate: false } },
+        onClick: (event, elements, chart) => {
+          if (!elements?.length) return;
+          const index = elements[0].index;
+          const label = chart.data.labels?.[index];
+          if (label !== undefined) setChartDrillLabel(type, label);
+        }
+      }
     };
   } else {
     config = {
@@ -577,12 +936,124 @@ function renderChart(type) {
           };
         })
       },
-      options: { ...defaults, barPercentage: 0.7, categoryPercentage: 0.8 }
+      options: {
+        ...defaults,
+        barPercentage: 0.7,
+        categoryPercentage: 0.8,
+        onClick: (event, elements, chart) => {
+          if (!elements?.length) return;
+          const index = elements[0].index;
+          const label = chart.data.labels?.[index];
+          if (label !== undefined) setChartDrillLabel(type, label);
+        }
+      }
+    };
+  }
+
+  if (type === 'pie') {
+    config.options = {
+      ...config.options,
+      onClick: (event, elements, chart) => {
+        if (!elements?.length) return;
+        const index = elements[0].index;
+        const label = chart.data.labels?.[index];
+        if (label !== undefined) setChartDrillLabel(type, label);
+      }
     };
   }
 
   lockCanvasHeight(canvas, 260);
   cs.instance = new Chart(canvas, config);
+}
+
+function renderChartTable(type, rows, entryLimit = 30) {
+  const head = document.getElementById('table-head-' + type);
+  const body = document.getElementById('table-body-' + type);
+  const meta = document.getElementById('table-meta-' + type);
+  const btn  = document.getElementById('btn-download-table-' + type);
+  if (!head || !body || !meta || !btn) return;
+
+  const limitedRows = rows.slice(0, Math.max(5, Math.min(30, Number(entryLimit) || 30)));
+  state.chartTableRows[type] = limitedRows;
+
+  if (!state.headers.length || !limitedRows.length) {
+    head.innerHTML = '';
+    body.innerHTML = '<tr><td class="px-4 py-3 text-slate-500" colspan="1">No rows match the current filter.</td></tr>';
+    meta.textContent = 'No matching rows';
+    btn.classList.add('hidden');
+    return;
+  }
+
+  const previewRows = limitedRows;
+  head.innerHTML = '<tr>' + state.headers.map(h => `<th class="px-3 py-2 text-left font-semibold text-slate-700 whitespace-nowrap border-b border-slate-200">${escHtml(h)}</th>`).join('') + '</tr>';
+  body.innerHTML = previewRows.map(r => (
+    '<tr>' + state.headers.map(h => `<td class="px-3 py-2 text-slate-700 whitespace-nowrap">${escHtml(r[h])}</td>`).join('') + '</tr>'
+  )).join('');
+
+  meta.textContent = `${limitedRows.length.toLocaleString()} of ${rows.length.toLocaleString()} row(s) shown`;
+  btn.classList.remove('hidden');
+}
+
+function csvEscape(v) {
+  const s = String(v ?? '');
+  if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+function escHtml(v) {
+  return String(v ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// XLSX download: uses SheetJS to create a workbook and set column widths
+function downloadChartTableXLSX(type) {
+  const rows = state.chartTableRows[type] || [];
+  if (!rows.length || !state.headers.length) { showToast('No table data to download.', 'error'); return; }
+
+  const headers = state.headers.slice();
+  const data = [headers].concat(rows.map(r => headers.map(h => r[h] == null ? '' : r[h])));
+
+  const ws = XLSX.utils.aoa_to_sheet(data);
+
+  // Estimate reasonable column widths based on max content length
+  ws['!cols'] = headers.map((h, i) => {
+    const maxLen = data.reduce((m, row) => Math.max(m, String(row[i] ?? '').length), 0);
+    const w = Math.min(80, Math.max(8, Math.ceil(maxLen * 1.15)));
+    return { wch: w };
+  });
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, (type || 'Sheet1').slice(0,31));
+
+  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([wbout], { type: 'application/octet-stream' });
+  const fname = (state.filename ? state.filename.replace(/\.[^.]+$/, '') : 'data') + '-' + type + '-filtered.xlsx';
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = fname; document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function downloadChartTableCSV(type) {
+  const rows = state.chartTableRows[type] || [];
+  if (!rows.length || !state.headers.length) {
+    showToast('No table data to download.', 'error');
+    return;
+  }
+  const lines = [];
+  lines.push(state.headers.map(csvEscape).join(','));
+  rows.forEach(r => {
+    lines.push(state.headers.map(h => csvEscape(r[h])).join(','));
+  });
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.download = (state.filename || 'data') + '-' + type + '-filtered.csv';
+  link.href = URL.createObjectURL(blob);
+  link.click();
+  URL.revokeObjectURL(link.href);
 }
 
 function buildSeriesPanel(type) {
@@ -875,6 +1346,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('theme-toggle')?.addEventListener('click', toggleTheme);
   document.getElementById('btn-download-all')?.addEventListener('click', downloadAll);
+  CHART_TYPES.forEach(type => {
+    document.getElementById('btn-download-table-' + type)?.addEventListener('click', () => downloadChartTableXLSX(type));
+    document.getElementById('entries-limit-' + type)?.addEventListener('change', e => {
+      state.charts[type].entryLimit = Number(e.target.value) || (DEFAULT_ENTRY_LIMITS[type] || 30);
+      renderChart(type);
+    });
+    document.getElementById('sort-order-' + type)?.addEventListener('change', e => {
+      state.charts[type].sortOrder = e.target.value || 'default';
+      renderChart(type);
+    });
+    document.getElementById('selection-mode-' + type)?.addEventListener('change', e => {
+      state.charts[type].selectionMode = e.target.value || 'current';
+      renderChart(type);
+    });
+  });
 
   document.addEventListener('click', e => {
     if (state.isRendering) { e.preventDefault(); e.stopPropagation(); return false; }
@@ -891,6 +1377,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (action === 'download') { e.preventDefault(); downloadChartPNG(type); }
     if (action === 'ai') { e.preventDefault(); aiFixChart(type); }
+    if (action === 'reset') { e.preventDefault(); resetChartState(type); }
   }, true);
 
   const DC = window.DATACHART;
