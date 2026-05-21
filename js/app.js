@@ -31,6 +31,22 @@ const DEFAULT_SELECTION_MODES = {
 
 const ENTRY_LIMIT_CHOICES = [5, 10, 15, 20, 25, 30];
 
+function hashText(text) {
+  const input = String(text ?? '');
+  let hash = 0;
+  for (let i = 0; i < input.length; i += 1) {
+    hash = ((hash << 5) - hash + input.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
+}
+
+function getStablePieColor(label, index) {
+  const name = String(label ?? '').trim();
+  if (!name) return PALETTE[index % PALETTE.length];
+  if (/^other(\s*\(|$)/i.test(name)) return '#94a3b8';
+  return PALETTE[hashText(name) % PALETTE.length];
+}
+
 function getChartEntryCap(type, availableCount) {
   const dataCap = Math.max(1, Number(availableCount) || 1);
   const typeCap = type === 'pie' ? 10 : 30;
@@ -286,7 +302,8 @@ function setChartDrillLabel(type, label) {
   const cs = state.charts[type];
   if (!cs) return;
   const nextLabel = String(label ?? '').trim();
-  cs.drillLabel = cs.drillLabel === nextLabel ? '' : nextLabel;
+  if (!nextLabel) return;
+  cs.drillLabel = nextLabel;
   renderChart(type);
 }
 
@@ -808,20 +825,33 @@ function renderChart(type) {
         labels: slices.map(d => d.name),
         datasets: [{
           data: slices.map(d => d.value),
-          backgroundColor: PALETTE.slice(0, slices.length),
+          backgroundColor: slices.map((d, i) => getStablePieColor(d.name, i)),
+          hoverBackgroundColor: slices.map((d, i) => getStablePieColor(d.name, i)),
+          hoverOffset: 10,
           borderWidth: 2, borderColor: dk ? '#1e293b' : '#ffffff'
         }]
       },
       options: {
-        responsive: true, maintainAspectRatio: false, resizeDelay: 100, animation: false, animations: false,
+        responsive: true, maintainAspectRatio: false, resizeDelay: 100,
+        animation: { duration: 700, easing: 'easeOutQuart', animateRotate: true, animateScale: true },
         layout: { padding: { right: 10 } },
+        onClick: (event, elements, chart) => {
+          if (!elements?.length) return;
+          const index = elements[0].index;
+          const label = chart.data.labels?.[index];
+          if (label !== undefined) setChartDrillLabel(type, label);
+        },
         plugins: {
           legend: {
             display: true, position: 'right',
+            onClick: (event, legendItem, legend) => {
+              const label = legendItem?.text;
+              if (label !== undefined) setChartDrillLabel(type, label);
+            },
             labels: {
               color: dk ? '#64748b' : '#475569', font: { size: 10 }, padding: 12, usePointStyle: true, boxWidth: 6,
               generateLabels: chart => chart.data.labels.map((label, i) => ({
-                text: String(label), fillStyle: PALETTE[i % PALETTE.length],
+                text: String(label), fillStyle: getStablePieColor(label, i),
                 strokeStyle: dk ? '#1e293b' : '#ffffff', lineWidth: 2, index: i
               }))
             }
