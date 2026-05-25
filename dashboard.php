@@ -42,6 +42,7 @@ if ($activeFile) {
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600;700;800&display=swap" rel="stylesheet" />
   <script>
@@ -55,6 +56,7 @@ if ($activeFile) {
     }
   </script>
   <link rel="stylesheet" href="css/app.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 </head>
 <body class="min-h-screen bg-white text-black font-sans m-0 p-0">
 
@@ -144,16 +146,21 @@ if ($activeFile) {
       </div>
 
       <!-- Controls bar -->
-      <div class="bg-white rounded-lg border border-slate-200 p-3 mb-5 flex flex-wrap gap-4 items-center">
-        <span class="text-slate-500 text-[11px] uppercase tracking-widest">Group / Label</span>
-        <div style="display:flex;gap:8px;align-items:center">
-          <select id="label-col-select"
-            class="bg-white border border-slate-200 text-black rounded-md px-3 py-1.5 text-xs focus:outline-none focus:border-brand-500">
-          </select>
-          <button id="label-clear-btn" class="filter-btn clear-btn" type="button" title="Clear group/label selection">Clear</button>
+      <div id="label-row" class="bg-white rounded-xl border border-slate-200 p-4 mb-5">
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div class="min-w-0">
+            <p class="text-slate-500 text-[11px] uppercase tracking-widest mb-1">Group / Label</p>
+            <p class="text-slate-400 text-xs leading-relaxed max-w-2xl">
+              Choose one column to group the charts. Keep it simple so the whole dashboard stays readable.
+            </p>
+          </div>
+          <div class="flex flex-col sm:flex-row sm:items-center gap-3 w-full lg:flex-1 lg:min-w-0">
+            <select id="label-col-select"
+              class="w-full lg:flex-1 lg:min-w-0 bg-white border border-slate-200 text-black rounded-md px-3 py-2 text-sm focus:outline-none focus:border-brand-500 text-color:text-black">
+            </select>
+            <button id="label-clear-btn" class="filter-btn clear-btn self-start sm:self-auto whitespace-nowrap" type="button" title="Reset all charts to their default group">Reset All Charts</button>
+          </div>
         </div>
-        <span class="text-slate-700 text-xs hidden sm:inline">—</span>
-        <span class="text-slate-500 text-xs hidden sm:inline">Charts are grouped and summed by this column.</span>
       </div>
 
       <!-- No numeric warning -->
@@ -171,7 +178,7 @@ if ($activeFile) {
               <div class="flex items-center gap-2 flex-wrap">
                 <span class="text-black font-semibold text-sm">{$label}</span>
                 <span id="badge-entries-{$type}" class="bg-white text-slate-500 text-[10px] px-2 py-0.5 rounded-full border border-slate-200">— entries</span>
-                <span id="badge-filter-{$type}" class="hidden bg-blue-950 text-blue-300 text-[10px] px-2 py-0.5 rounded-full border border-blue-800"></span>
+                <span id="badge-filter-{$type}" class="hidden bg-blue-950 text-blue-300 text-[10px] px-2 py-1 rounded-lg border border-blue-800 max-w-[220px] whitespace-normal break-words leading-tight text-left"></span>
               </div>
               <div class="flex gap-2">
                 <select id="entries-limit-{$type}" class="bg-white border border-slate-200 text-slate-700 rounded-md px-2 py-1 text-[11px] focus:outline-none">
@@ -267,6 +274,18 @@ HTML;
         echo chartCard('pie',  'Pie / Donut');
         ?>
       </div>
+
+      <!-- Philippines Map -->
+      <section id="map-panel" class="bg-white rounded-2xl border border-slate-200 overflow-hidden mb-5">
+        <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between gap-3">
+          <div>
+            <p class="text-black font-semibold text-sm">Philippines Map</p>
+            <p class="text-slate-400 text-[11px]">Hover a region to see total construction cost.</p>
+          </div>
+          <div id="map-legend" class="flex items-center gap-2 text-[10px] text-slate-500"></div>
+        </div>
+        <div id="ph-map" class="w-full h-[460px] bg-slate-50"></div>
+      </section>
 
     </section>
   </main>

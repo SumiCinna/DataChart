@@ -235,6 +235,11 @@ select:focus {
   background: transparent !important;
 }
 
+#label-clear-btn,
+#label-clear-btn:hover {
+  color: #000 !important;
+}
+
 button {
   background: var(--bg-secondary);
   border: 1px solid var(--border-primary);
@@ -316,6 +321,11 @@ input[type="file"] {
 
 #label-row select {
   font-size: 13px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 
@@ -373,4 +383,9 @@ header[class*="bg-blue"] .nav-link-btn, header[class*="bg-blue"] a, header[class
 }
 [id^="filter-panel-"] select {
   color: #0f172a !important;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

@@ -30,6 +30,41 @@ const DEFAULT_SELECTION_MODES = {
 };
 
 const ENTRY_LIMIT_CHOICES = [5, 10, 15, 20, 25, 30];
+const PH_MAP_GEOJSON_URL = 'https://raw.githubusercontent.com/faeldon/philippines-json-maps/master/2023/geojson/country/lowres/country.0.001.json';
+const MAP_BUCKET_LOW_MAX = 90_000_000;
+const MAP_BUCKET_MID_MAX = 180_000_000;
+
+function formatMapAmount(value) {
+  const v = Number(value || 0);
+  if (v >= 1e9) return (v / 1e9).toFixed(1) + 'B';
+  if (v >= 1e6) return (v / 1e6).toFixed(0) + 'M';
+  if (v >= 1e3) return (v / 1e3).toFixed(0) + 'K';
+  return String(Math.round(v));
+}
+
+function getMapBucket(value, buckets) {
+  if (value === null || value === undefined) return 'none';
+  if (value <= buckets.lowMax) return 'low';
+  if (value <= buckets.midMax) return 'mid';
+  return 'high';
+}
+
+function buildMapBuckets(values) {
+  const fixed = { lowMax: MAP_BUCKET_LOW_MAX, midMax: MAP_BUCKET_MID_MAX, mode: 'fixed' };
+  if (!values.length) return fixed;
+
+  const fixedKinds = new Set(values.map(v => getMapBucket(v, fixed)));
+  if (fixedKinds.size > 1) return fixed;
+
+  const sorted = [...values].sort((a, b) => a - b);
+  const lowIdx = Math.floor((sorted.length - 1) * 0.33);
+  const midIdx = Math.floor((sorted.length - 1) * 0.66);
+  const lowMax = sorted[Math.max(0, lowIdx)] || fixed.lowMax;
+  const midRaw = sorted[Math.max(0, midIdx)] || fixed.midMax;
+  const midMax = Math.max(midRaw, lowMax + 1);
+
+  return { lowMax, midMax, mode: 'adaptive' };
+}
 
 function hashText(text) {
   const input = String(text ?? '');
@@ -80,6 +115,7 @@ const state = {
   numericCols: [],
   filename:    '',
   chartTableRows: { line: [], bar: [], area: [], pie: [] },
+  map: { instance: null, layer: null, loaded: false },
   theme:       localStorage.getItem('dc-theme') || 'dark',
   isRendering: false,
   renderTimeout: null,
@@ -425,6 +461,7 @@ function processRows(rawRows, rawFields, name) {
 
   const total = numeric[0] ? normalized.reduce((s, r) => s + Number(r[numeric[0]] || 0), 0) : 0;
   updateStats(rows.length, fields.length, numeric, total);
+  renderPhilippinesMap().catch(err => console.error('Map render error:', err));
   populateLabelColSelect();
   renderAllCharts();
   hideLoadingOverlay();
@@ -504,6 +541,199 @@ function updateStats(totalRows, colCount, numeric, total) {
   document.getElementById('stat-total-label').textContent = (numeric[0] || 'Value') + ' Total';
 }
 
+function normalizeMapText(value) {
+  return String(value ?? '')
+    .toLowerCase()
+    .replace(/\(.*?\)/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function hexToRgb(hex) {
+  const clean = String(hex || '').replace('#', '');
+  const expanded = clean.length === 3 ? clean.split('').map(ch => ch + ch).join('') : clean;
+  return {
+    r: parseInt(expanded.slice(0, 2), 16),
+    g: parseInt(expanded.slice(2, 4), 16),
+    b: parseInt(expanded.slice(4, 6), 16),
+  };
+}
+
+function rgbToHex({ r, g, b }) {
+  const toHex = value => Math.max(0, Math.min(255, Math.round(value))).toString(16).padStart(2, '0');
+  return '#' + toHex(r) + toHex(g) + toHex(b);
+}
+
+function mixHex(start, end, amount) {
+  const from = hexToRgb(start);
+  const to = hexToRgb(end);
+  return rgbToHex({
+    r: from.r + (to.r - from.r) * amount,
+    g: from.g + (to.g - from.g) * amount,
+    b: from.b + (to.b - from.b) * amount,
+  });
+}
+
+function getMapRegionColumn() {
+  return findHeaderByKeywords(['region']);
+}
+
+function getMapCostColumn() {
+  const exact = state.headers.find(h => /cost/i.test(h));
+  if (exact) return exact;
+  return state.numericCols[0] || '';
+}
+
+function buildRegionCostRows() {
+  const regionCol = getMapRegionColumn();
+  const costCol = getMapCostColumn();
+  if (!regionCol || !costCol) return { regionCol: '', costCol: '', items: [], maxCost: 0 };
+
+  const totals = new Map();
+  state.allRows.forEach(row => {
+    const region = String(row[regionCol] ?? '').trim();
+    if (!region) return;
+    const cost = Number(row[costCol] || 0);
+    totals.set(region, (totals.get(region) || 0) + (Number.isFinite(cost) ? cost : 0));
+  });
+
+  const items = Array.from(totals.entries()).map(([name, value]) => ({ name, value }));
+  const maxCost = items.reduce((max, item) => Math.max(max, item.value), 0);
+  return { regionCol, costCol, items, maxCost };
+}
+
+function findRegionCost(featureName, items) {
+  const target = normalizeMapText(featureName);
+  if (!target) return null;
+  for (const item of items) {
+    const name = normalizeMapText(item.name);
+    if (!name) continue;
+    if (target === name || target.includes(name) || name.includes(target)) return item.value;
+  }
+  return null;
+}
+
+async function renderPhilippinesMap() {
+  const mapEl = document.getElementById('ph-map');
+  const legendEl = document.getElementById('map-legend');
+  if (!mapEl || !legendEl || typeof L === 'undefined') return;
+
+  if (!state.allRows.length) {
+    mapEl.innerHTML = '<div class="h-full flex items-center justify-center text-slate-400 text-sm">Load a dataset to view the map.</div>';
+    legendEl.innerHTML = '';
+    return;
+  }
+
+  const { regionCol, costCol, items } = buildRegionCostRows();
+  if (!regionCol || !costCol || !items.length) {
+    mapEl.innerHTML = '<div class="h-full flex items-center justify-center text-slate-400 text-sm">No region or cost column found for the map.</div>';
+    legendEl.innerHTML = '';
+    return;
+  }
+
+  const values = items
+    .map(item => Number(item.value))
+    .filter(v => Number.isFinite(v) && v >= 0);
+  const buckets = buildMapBuckets(values);
+
+  if (!state.map.instance) {
+    state.map.instance = L.map('ph-map', { zoomControl: true, scrollWheelZoom: false, minZoom: 4, maxZoom: 10 });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(state.map.instance);
+  }
+
+  if (state.map.layer) {
+    state.map.layer.remove();
+    state.map.layer = null;
+  }
+
+  const dk = state.theme === 'dark';
+  const lowColor = dk ? '#1d4ed8' : '#93c5fd';
+  const midColor = dk ? '#3b82f6' : '#3b82f6';
+  const highColor = dk ? '#7c3aed' : '#1e3a8a';
+  const borderColor = dk ? '#dbeafe' : '#1e3a8a';
+
+  const geo = await fetch(PH_MAP_GEOJSON_URL, { credentials: 'omit' }).then(resp => {
+    if (!resp.ok) throw new Error('Map data fetch failed');
+    return resp.json();
+  });
+
+  state.map.layer = L.geoJSON(geo, {
+    style: feature => {
+      const regionName = feature.properties?.adm1_en || feature.properties?.name || '';
+      const value = findRegionCost(regionName, items);
+      const hasValue = value !== null;
+      let fillColor = dk ? '#334155' : '#e2e8f0';
+      if (hasValue) {
+        const bucket = getMapBucket(value, buckets);
+        if (bucket === 'low') fillColor = lowColor;
+        else if (bucket === 'mid') fillColor = midColor;
+        else fillColor = highColor;
+      }
+      return {
+        color: borderColor,
+        weight: 1,
+        fillColor,
+        fillOpacity: hasValue ? 0.68 : 0.28,
+      };
+    },
+    onEachFeature: (feature, layer) => {
+      const regionName = feature.properties?.adm1_en || feature.properties?.name || 'Unknown region';
+      const value = findRegionCost(regionName, items);
+      const hasValue = value !== null;
+      const formatted = hasValue ? value.toLocaleString() : 'No data';
+      let bucketLabel = 'No data';
+      if (hasValue) {
+        const bucket = getMapBucket(value, buckets);
+        const lowText = formatMapAmount(buckets.lowMax);
+        const midText = formatMapAmount(buckets.midMax);
+        if (bucket === 'low') bucketLabel = `Low (0-${lowText})`;
+        else if (bucket === 'mid') bucketLabel = `Mid (${lowText}-${midText})`;
+        else bucketLabel = `High (${midText}+)`;
+      }
+
+      layer.bindTooltip(
+        `<div style="font-family: IBM Plex Sans, sans-serif; font-size: 12px;">
+          <div style="font-weight: 700; margin-bottom: 4px;">${escHtml(regionName)}</div>
+          <div>Cost: ${formatted}</div>
+          <div>Bucket: ${bucketLabel}</div>
+        </div>`,
+        { sticky: true, direction: 'top', opacity: 0.95 }
+      );
+
+      layer.on({
+        mouseover: e => {
+          e.target.setStyle({ weight: 2, fillOpacity: 0.9 });
+          e.target.bringToFront();
+        },
+        mouseout: e => {
+          state.map.layer && state.map.layer.resetStyle(e.target);
+        },
+      });
+    }
+  }).addTo(state.map.instance);
+
+  const bounds = state.map.layer.getBounds();
+  if (bounds.isValid()) state.map.instance.fitBounds(bounds.pad(0.08));
+  else state.map.instance.setView([12.8797, 121.7740], 5);
+
+  const lowText = formatMapAmount(buckets.lowMax);
+  const midText = formatMapAmount(buckets.midMax);
+  const bucketNote = buckets.mode === 'adaptive' ? ' (auto-scaled)' : '';
+
+  legendEl.innerHTML = `
+    <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded-sm" style="background:${lowColor}"></span> Low 0-${lowText}</span>
+    <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded-sm" style="background:${midColor}"></span> Mid ${lowText}-${midText}</span>
+    <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded-sm" style="background:${highColor}"></span> High ${midText}+</span>
+    <span class="text-[10px] text-slate-400">${bucketNote}</span>
+  `;
+
+  state.map.loaded = true;
+}
+
 // Global GROUP / LABEL — starts blank, user selects once to override ALL charts
 function populateLabelColSelect() {
   const sel = document.getElementById('label-col-select');
@@ -526,20 +756,12 @@ function populateLabelColSelect() {
   // Wire up the Clear button next to the global select (if present)
   const clearBtn = document.getElementById('label-clear-btn');
   if (clearBtn) {
-    clearBtn.style.display = 'none';
     clearBtn.onclick = () => {
       sel.value = '';
       // restore each chart's default display column
       CHART_TYPES.forEach(t => { state.charts[t].displayCol = resolveDefault(t); state.chartsToRender.add(t); });
       showLoadingOverlay();
       setTimeout(() => { renderAllCharts(); hideLoadingOverlay(); }, 400);
-    };
-    // Show/hide when select changes
-    const origOnChange = sel.onchange;
-    sel.onchange = () => {
-      if (sel.value) clearBtn.style.display = 'inline-block';
-      else clearBtn.style.display = 'none';
-      if (origOnChange) origOnChange();
     };
   }
 }
@@ -558,6 +780,11 @@ function buildFilterPanel(type) {
   const cs = state.charts[type];
   const hints = getHierarchyHints();
   const guide = document.getElementById('filter-guide-' + type);
+  const hasLevel1 = !!cs.filterCol;
+  const hasLevel1Value = hasLevel1 && !!cs.filterVal;
+  const hasLevel2 = hasLevel1Value && !!cs.filterCol2;
+  const hasLevel2Value = hasLevel2 && !!cs.filterVal2;
+  const hasLevel3 = hasLevel2Value && !!cs.filterCol3;
 
   const opt = (value, selected = false) => `<option value="${String(value).replace(/"/g, '&quot;')}"${selected ? ' selected' : ''}>${escHtml(value)}</option>`;
 
@@ -565,14 +792,16 @@ function buildFilterPanel(type) {
     state.headers.map(h => opt(h, h === cs.filterCol))
   );
   filterColSel.innerHTML = primaryColOptions.join('');
-  valSel.classList.toggle('hidden', !cs.filterCol);
+  valSel.classList.toggle('hidden', !hasLevel1);
+  valSel.disabled = !hasLevel1;
 
   const secondaryCols = state.headers.filter(h => h !== cs.filterCol);
   const secondaryColOptions = [`<option value="">Level 2 column (e.g., ${escHtml(hints.level2)})</option>`].concat(
     secondaryCols.map(h => opt(h, h === cs.filterCol2))
   );
 
-  col2Sel.classList.toggle('hidden', !cs.filterCol);
+  col2Sel.classList.toggle('hidden', !hasLevel1Value);
+  col2Sel.disabled = !hasLevel1Value;
   col2Sel.innerHTML = secondaryColOptions.join('');
 
   const primaryValues = cs.filterCol ? getUniqueValues(state.allRows, cs.filterCol) : [];
@@ -583,25 +812,34 @@ function buildFilterPanel(type) {
     : state.allRows;
 
   const secondaryValues = cs.filterCol2 ? getUniqueValues(rowsAfterPrimary, cs.filterCol2) : [];
-  val2Sel.classList.toggle('hidden', !cs.filterCol2);
+  val2Sel.classList.toggle('hidden', !hasLevel1Value || !cs.filterCol2);
+  val2Sel.disabled = !hasLevel1Value || !cs.filterCol2;
   val2Sel.innerHTML = `<option value="">All ${escHtml(cs.filterCol2 || hints.level2)}</option>` + secondaryValues.map(v => opt(v, v === cs.filterVal2)).join('');
 
   const tertiaryCols = state.headers.filter(h => h !== cs.filterCol && h !== cs.filterCol2);
   const tertiaryColOptions = [`<option value="">Level 3 column (e.g., ${escHtml(hints.level3)})</option>`].concat(
     tertiaryCols.map(h => opt(h, h === cs.filterCol3))
   );
-  col3Sel.classList.toggle('hidden', !cs.filterCol2);
+  col3Sel.classList.toggle('hidden', !hasLevel2Value);
+  col3Sel.disabled = !hasLevel2Value;
   col3Sel.innerHTML = tertiaryColOptions.join('');
 
   const rowsAfterSecondary = cs.filterCol2 && cs.filterVal2
     ? rowsAfterPrimary.filter(r => normFilterVal(r[cs.filterCol2]) === normFilterVal(cs.filterVal2))
     : rowsAfterPrimary;
   const tertiaryValues = cs.filterCol3 ? getUniqueValues(rowsAfterSecondary, cs.filterCol3) : [];
-  val3Sel.classList.toggle('hidden', !cs.filterCol3);
+  val3Sel.classList.toggle('hidden', !hasLevel2Value || !cs.filterCol3);
+  val3Sel.disabled = !hasLevel2Value || !cs.filterCol3;
   val3Sel.innerHTML = `<option value="">All ${escHtml(cs.filterCol3 || hints.level3)}</option>` + tertiaryValues.map(v => opt(v, v === cs.filterVal3)).join('');
 
   if (guide) {
-    guide.textContent = `1) Choose ${cs.filterCol || hints.level1}. 2) Narrow using ${cs.filterCol2 || hints.level2}. 3) Pick the most specific ${cs.filterCol3 || hints.level3}.`;
+    guide.textContent = hasLevel3
+      ? `1) Choose ${cs.filterCol}. 2) Choose ${cs.filterCol2}. 3) Choose ${cs.filterCol3}.`
+      : hasLevel2Value
+        ? `1) Choose ${cs.filterCol}. 2) Choose ${cs.filterCol2}. Now pick the third column if needed.`
+        : hasLevel1Value
+          ? `1) Choose ${cs.filterCol}. Now pick the second column.`
+          : `Start with the first column, then pick a value before the next filter unlocks.`;
   }
 
   clearBtn.classList.toggle('hidden', !(cs.filterCol || cs.filterVal || cs.filterCol2 || cs.filterVal2 || cs.filterCol3 || cs.filterVal3));
@@ -621,6 +859,8 @@ function buildFilterPanel(type) {
     cs.filterVal2 = '';
     cs.filterCol3 = '';
     cs.filterVal3 = '';
+    cs.drillLabel = '';
+    cs.displayCol = cs.filterCol || resolveDefault(type);
     buildFilterPanel(type);
     updateFilterBadge(type);
     state.chartsToRender.add(type);
@@ -629,6 +869,7 @@ function buildFilterPanel(type) {
 
   valSel.onchange = () => {
     cs.filterVal = valSel.value;
+    cs.drillLabel = '';
     if (cs.filterCol2 && cs.filterVal2) {
       const rowsScoped = cs.filterVal
         ? state.allRows.filter(r => normFilterVal(r[cs.filterCol]) === normFilterVal(cs.filterVal))
@@ -648,6 +889,7 @@ function buildFilterPanel(type) {
     cs.filterVal2 = '';
     cs.filterCol3 = '';
     cs.filterVal3 = '';
+    cs.drillLabel = '';
     buildFilterPanel(type);
     updateFilterBadge(type);
     state.chartsToRender.add(type);
@@ -657,6 +899,7 @@ function buildFilterPanel(type) {
   val2Sel.onchange = () => {
     cs.filterVal2 = val2Sel.value;
     cs.filterVal3 = '';
+    cs.drillLabel = '';
     buildFilterPanel(type);
     updateFilterBadge(type);
     state.chartsToRender.add(type);
@@ -666,6 +909,7 @@ function buildFilterPanel(type) {
   col3Sel.onchange = () => {
     cs.filterCol3 = col3Sel.value;
     cs.filterVal3 = '';
+    cs.drillLabel = '';
     buildFilterPanel(type);
     updateFilterBadge(type);
     state.chartsToRender.add(type);
@@ -674,6 +918,7 @@ function buildFilterPanel(type) {
 
   val3Sel.onchange = () => {
     cs.filterVal3 = val3Sel.value;
+    cs.drillLabel = '';
     updateFilterBadge(type);
     state.chartsToRender.add(type);
     debounceRender();
@@ -686,6 +931,8 @@ function buildFilterPanel(type) {
     cs.filterVal2 = '';
     cs.filterCol3 = '';
     cs.filterVal3 = '';
+    cs.drillLabel = '';
+    cs.displayCol = resolveDefault(type);
     buildFilterPanel(type);
     updateFilterBadge(type);
     state.chartsToRender.add(type);
@@ -700,14 +947,22 @@ function updateFilterBadge(type) {
   const cs         = state.charts[type];
   const displayCol = cs.displayCol;
   if (!badge) return;
+  const esc = (value) => String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
   const parts = [];
-  if (displayCol) parts.push('group: ' + displayCol);
-  if (cs.drillLabel) parts.push('clicked: ' + cs.drillLabel);
-  if (cs.filterCol && cs.filterVal) parts.push(cs.filterCol + ': ' + cs.filterVal);
-  if (cs.filterCol2 && cs.filterVal2) parts.push(cs.filterCol2 + ': ' + cs.filterVal2);
-  if (cs.filterCol3 && cs.filterVal3) parts.push(cs.filterCol3 + ': ' + cs.filterVal3);
+  if (displayCol) parts.push(['Group', displayCol]);
+  if (cs.filterCol) parts.push(['Filter', cs.filterVal ? cs.filterCol + ': ' + cs.filterVal : cs.filterCol]);
+  if (cs.drillLabel) parts.push(['Clicked', cs.drillLabel]);
+  if (cs.filterCol2) parts.push(['Level 2', cs.filterVal2 ? cs.filterCol2 + ': ' + cs.filterVal2 : cs.filterCol2]);
+  if (cs.filterCol3) parts.push(['Level 3', cs.filterVal3 ? cs.filterCol3 + ': ' + cs.filterVal3 : cs.filterCol3]);
   if (parts.length) {
-    badge.textContent = parts.join(' | ');
+    badge.innerHTML = parts.map(([label, value]) => {
+      return '<span class="block"><span class="font-semibold text-blue-200">' + esc(label) + ':</span> ' + esc(value) + '</span>';
+    }).join('');
     badge.classList.remove('hidden');
   } else {
     badge.classList.add('hidden');
@@ -775,7 +1030,7 @@ function renderChart(type) {
     selectionSelect.value = cs.selectionMode || 'current';
   }
 
-  const groupCol      = cs.displayCol || state.headers.find(h => !state.numericCols.includes(h)) || state.headers[0];
+  const groupCol      = cs.filterCol || cs.displayCol || state.headers.find(h => !state.numericCols.includes(h)) || state.headers[0];
   const sourceRows    = getChartSourceRows(type, groupCol);
   const visibleKeys = cs.activeKeys.filter(k => state.numericCols.includes(k));
   let agg           = aggregateByLabel(sourceRows, groupCol, state.numericCols);
@@ -795,7 +1050,7 @@ function renderChart(type) {
     agg = sortChartRows(agg, type, numericForSort, cs.sortOrder);
   }
 
-  renderChartTable(type, sourceRows, entryLimit);
+  renderChartTable(type, sourceRows, entryLimit, cs.selectionMode, numericForSort);
 
   const entryBadge = document.getElementById('badge-entries-' + type);
 
@@ -996,14 +1251,22 @@ function renderChart(type) {
   cs.instance = new Chart(canvas, config);
 }
 
-function renderChartTable(type, rows, entryLimit = 30) {
+function renderChartTable(type, rows, entryLimit = 30, selectionMode = 'current', numericKeys = []) {
   const head = document.getElementById('table-head-' + type);
   const body = document.getElementById('table-body-' + type);
   const meta = document.getElementById('table-meta-' + type);
   const btn  = document.getElementById('btn-download-table-' + type);
   if (!head || !body || !meta || !btn) return;
 
-  const limitedRows = rows.slice(0, Math.max(5, Math.min(30, Number(entryLimit) || 30)));
+  const limit = Math.max(5, Math.min(30, Number(entryLimit) || 30));
+  const mode = selectionMode || 'current';
+  const sortedRows = (mode === 'top' || mode === 'bottom')
+    ? rows.slice().sort((a, b) => {
+        const diff = getAggregateScore(a, numericKeys) - getAggregateScore(b, numericKeys);
+        return mode === 'top' ? -diff : diff;
+      })
+    : rows.slice();
+  const limitedRows = sortedRows.slice(0, limit);
   state.chartTableRows[type] = limitedRows;
 
   if (!state.headers.length || !limitedRows.length) {
@@ -1367,6 +1630,7 @@ function toggleTheme() {
   state.theme = state.theme === 'dark' ? 'light' : 'dark';
   localStorage.setItem('dc-theme', state.theme);
   document.documentElement.setAttribute('data-theme', state.theme);
+  if (state.allRows.length > 0) renderPhilippinesMap().catch(err => console.error('Map render error:', err));
   if (state.allRows.length > 0) CHART_TYPES.forEach(type => renderChart(type));
 }
 
