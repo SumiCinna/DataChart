@@ -17,6 +17,7 @@ async function renderPhilippinesMap() {
     legendEl.innerHTML = '';
     return;
   }
+  state.map.regionCol = regionCol;
 
   const values = items
     .map(item => Number(item.value))
@@ -37,9 +38,9 @@ async function renderPhilippinesMap() {
   }
 
   const dk = state.theme === 'dark';
-  const lowColor = dk ? '#1d4ed8' : '#93c5fd';
-  const midColor = dk ? '#3b82f6' : '#3b82f6';
-  const highColor = dk ? '#7c3aed' : '#1e3a8a';
+  const lowColor = dk ? '#facc15' : '#facc15';
+  const midColor = dk ? '#fb923c' : '#fb923c';
+  const highColor = dk ? '#22c55e' : '#22c55e';
   const borderColor = dk ? '#dbeafe' : '#1e3a8a';
 
   const geo = await fetch(PH_MAP_GEOJSON_URL, { credentials: 'omit' }).then(resp => {
@@ -47,6 +48,7 @@ async function renderPhilippinesMap() {
     return resp.json();
   });
 
+  state.map.regionIndex = [];
   state.map.layer = L.geoJSON(geo, {
     style: feature => {
       const regionName = feature.properties?.adm1_en || feature.properties?.name || '';
@@ -68,6 +70,8 @@ async function renderPhilippinesMap() {
     },
     onEachFeature: (feature, layer) => {
       const regionName = feature.properties?.adm1_en || feature.properties?.name || 'Unknown region';
+      const regionKey = normalizeMapText(regionName);
+      if (regionKey) state.map.regionIndex.push({ key: regionKey, name: regionName, layer });
       const value = findRegionCost(regionName, items);
       const hasValue = value !== null;
       const formatted = hasValue ? value.toLocaleString() : 'No data';
@@ -123,6 +127,7 @@ async function renderPhilippinesMap() {
   state.map.loaded = true;
 }
 
+
 function renderMapSelectionTable() {
   const panel = document.getElementById('map-results-panel');
   const regionBadge = document.getElementById('map-selected-region');
@@ -130,47 +135,70 @@ function renderMapSelectionTable() {
   const head = document.getElementById('map-table-head');
   const body = document.getElementById('map-table-body');
   const downloadBtn = document.getElementById('map-download-csv');
-  if (!panel || !regionBadge || !meta || !head || !body || !downloadBtn) return;
+  const downloadScope = document.getElementById('map-download-scope');
+  if (!panel || !regionBadge || !meta || !head || !body || !downloadBtn || !downloadScope) return;
 
   const region = state.map.selectedRegion || '';
   const rows = state.map.tableRows || [];
+  const query = String(state.map.searchQuery || '').trim();
+  const scope = state.map.searchScope || 'region';
+  const baseRows = scope === 'all' ? state.allRows : rows;
+  const filteredRows = filterMapRows(baseRows, query);
+  const scopeLabel = scope === 'all' ? 'All regions' : (region || 'Selected region');
 
-  if (!region) {
+  if (!region && scope === 'region' && !query) {
     panel.classList.add('hidden');
     regionBadge.textContent = '';
     meta.textContent = 'Click a region on the map to show its rows here.';
     head.innerHTML = '';
     body.innerHTML = '<tr><td class="px-3 py-3 text-slate-500" colspan="1">No region selected.</td></tr>';
     downloadBtn.classList.add('hidden');
+    downloadScope.classList.add('hidden');
     return;
   }
 
   panel.classList.remove('hidden');
-  regionBadge.textContent = region;
-  meta.textContent = rows.length
-    ? rows.length.toLocaleString() + ' row(s) for the selected region'
-    : 'No matching rows found for this region.';
-  downloadBtn.classList.toggle('hidden', !rows.length);
+  regionBadge.textContent = scopeLabel;
+  if (scope === 'all' && !query) {
+    meta.textContent = 'Enter a search term to scan all data.';
+  } else if (query) {
+    meta.textContent = filteredRows.length
+      ? filteredRows.length.toLocaleString() + ' row(s) matching "' + query + '"'
+      : 'No matching rows found for "' + query + '".';
+  } else {
+    meta.textContent = filteredRows.length
+      ? filteredRows.length.toLocaleString() + ' row(s) for the selected region'
+      : 'No matching rows found for this region.';
+  }
+  const hasRows = filteredRows.length > 0;
+  downloadBtn.classList.toggle('hidden', !hasRows);
+  downloadScope.classList.toggle('hidden', !hasRows);
 
   head.innerHTML = state.headers.length
     ? '<tr>' + state.headers.map(h => `<th class="px-3 py-2 text-left font-semibold text-slate-700 whitespace-nowrap border-b border-slate-200">${escHtml(h)}</th>`).join('') + '</tr>'
     : '';
-  body.innerHTML = rows.length
-    ? rows.map(row => (
+  body.innerHTML = filteredRows.length
+    ? filteredRows.map(row => (
         '<tr>' + state.headers.map(h => `<td class="px-3 py-2 text-slate-700 whitespace-nowrap">${escHtml(row[h])}</td>`).join('') + '</tr>'
       )).join('')
     : '<tr><td class="px-3 py-3 text-slate-500" colspan="' + Math.max(state.headers.length, 1) + '">No matching rows found.</td></tr>';
+}
+
+function filterMapRows(rows, query) {
+  if (!query) return rows;
+  const q = query.toLowerCase();
+  return rows.filter(row => state.headers.some(h => String(row[h] ?? '').toLowerCase().includes(q)));
 }
 
 function selectMapRegion(regionName, regionCol) {
   const region = String(regionName ?? '').trim();
   if (!region || !regionCol) return;
 
-  const target = normalizeMapText(region);
+  const targetKeys = getRegionAliasKeys(region);
   const rows = state.allRows.filter(row => {
-    const cell = normalizeMapText(row[regionCol]);
-    if (!cell || !target) return false;
-    return cell === target || cell.includes(target) || target.includes(cell);
+    const cellKeys = getRegionAliasKeys(row[regionCol]);
+    if (!cellKeys.length || !targetKeys.length) return false;
+    return targetKeys.some(key => cellKeys.includes(key));
   });
   state.map.selectedRegion = region;
   state.map.tableRows = rows;
@@ -179,8 +207,13 @@ function selectMapRegion(regionName, regionCol) {
 
 function downloadMapSelectionCsv() {
   const region = state.map.selectedRegion || '';
-  const rows = state.map.tableRows || [];
-  if (!region || !rows.length) return;
+  const query = String(state.map.searchQuery || '').trim();
+  const scope = state.map.searchScope || 'region';
+  const baseRows = scope === 'all' ? state.allRows : (state.map.tableRows || []);
+  const downloadScope = document.getElementById('map-download-scope');
+  const mode = downloadScope ? downloadScope.value : 'shown';
+  const rows = mode === 'all' ? baseRows : filterMapRows(baseRows, query);
+  if (!rows.length) return;
   const headers = state.headers || [];
   const csvLines = [headers.map(csvEscape).join(',')];
   rows.forEach(row => {
@@ -189,7 +222,8 @@ function downloadMapSelectionCsv() {
   const blob = new Blob([csvLines.join('\n')], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  const safeRegion = String(region).trim().replace(/[^a-z0-9\-_. ]/gi, '').replace(/\s+/g, '_') || 'region';
+  const label = scope === 'all' ? 'all_regions' : (region || 'region');
+  const safeRegion = String(label).trim().replace(/[^a-z0-9\-_. ]/gi, '').replace(/\s+/g, '_') || 'region';
   link.href = url;
   link.download = `map_${safeRegion}.csv`;
   document.body.appendChild(link);
@@ -203,4 +237,36 @@ document.addEventListener('click', e => {
   if (!btn) return;
   e.preventDefault();
   downloadMapSelectionCsv();
+});
+
+document.addEventListener('click', e => {
+  const btn = e.target.closest('#map-search-btn');
+  if (!btn) return;
+  e.preventDefault();
+  const input = document.getElementById('map-search-input');
+  if (!input) return;
+  state.map.searchQuery = String(input.value || '').trim();
+  renderMapSelectionTable();
+});
+
+document.addEventListener('input', e => {
+  const input = e.target.closest('#map-search-input');
+  if (!input) return;
+  state.map.searchQuery = String(input.value || '').trim();
+  renderMapSelectionTable();
+});
+
+document.addEventListener('change', e => {
+  const scope = e.target.closest('#map-search-scope');
+  if (!scope) return;
+  state.map.searchScope = scope.value || 'region';
+  renderMapSelectionTable();
+});
+
+document.addEventListener('keydown', e => {
+  const input = e.target.closest('#map-search-input');
+  if (!input || e.key !== 'Enter') return;
+  e.preventDefault();
+  state.map.searchQuery = String(input.value || '').trim();
+  renderMapSelectionTable();
 });

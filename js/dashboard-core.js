@@ -40,7 +40,7 @@ const state = {
   numericCols: [],
   filename:    '',
   chartTableRows: { line: [], bar: [], area: [], pie: [] },
-  map: { instance: null, layer: null, loaded: false, selectedRegion: '', tableRows: [] },
+  map: { instance: null, layer: null, loaded: false, selectedRegion: '', tableRows: [], regionIndex: [], searchQuery: '', searchScope: 'region' },
   theme:       localStorage.getItem('dc-theme') || 'dark',
   isRendering: false,
   renderTimeout: null,
@@ -496,6 +496,36 @@ function normalizeMapText(value) {
     .trim();
 }
 
+function getRegionAliasKeys(value) {
+  const base = normalizeMapText(value);
+  if (!base) return [];
+  const aliases = {
+    ncr: ['national capital region'],
+    'national capital region': ['ncr'],
+    car: ['cordillera administrative region'],
+    'cordillera administrative region': ['car'],
+    barmm: ['bangsamoro autonomous region in muslim mindanao', 'bangsamoro autonomous region'],
+    'bangsamoro autonomous region in muslim mindanao': ['barmm', 'bangsamoro autonomous region'],
+    'bangsamoro autonomous region': ['barmm', 'bangsamoro autonomous region in muslim mindanao'],
+    'ilocos region': ['region i', 'region 1'],
+    'cagayan valley': ['region ii', 'region 2'],
+    'central luzon': ['region iii', 'region 3'],
+    calabarzon: ['region iv a', 'region iva', 'region 4a'],
+    mimaropa: ['region iv b', 'region ivb', 'region 4b'],
+    'bicol region': ['region v', 'region 5'],
+    'western visayas': ['region vi', 'region 6'],
+    'central visayas': ['region vii', 'region 7'],
+    'eastern visayas': ['region viii', 'region 8'],
+    'zamboanga peninsula': ['region ix', 'region 9'],
+    'northern mindanao': ['region x', 'region 10'],
+    'davao region': ['region xi', 'region 11'],
+    soccsksargen: ['region xii', 'region 12'],
+    caraga: ['region xiii', 'region 13'],
+  };
+  const list = [base].concat(aliases[base] || []);
+  return Array.from(new Set(list.map(normalizeMapText).filter(Boolean)));
+}
+
 function isRegionLikeColumn(col) {
   return /region|province|state|district|area/i.test(String(col || ''));
 }
@@ -566,12 +596,12 @@ function buildRegionCostRows() {
 }
 
 function findRegionCost(featureName, items) {
-  const target = normalizeMapText(featureName);
-  if (!target) return null;
+  const targetKeys = getRegionAliasKeys(featureName);
+  if (!targetKeys.length) return null;
   for (const item of items) {
-    const name = normalizeMapText(item.name);
-    if (!name) continue;
-    if (target === name || target.includes(name) || name.includes(target)) return item.value;
+    const itemKeys = getRegionAliasKeys(item.name);
+    if (!itemKeys.length) continue;
+    if (targetKeys.some(key => itemKeys.includes(key))) return item.value;
   }
   return null;
 }

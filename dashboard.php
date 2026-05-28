@@ -294,7 +294,17 @@ HTML;
             <p class="text-black font-semibold text-sm">Philippines Map</p>
             <p class="text-slate-400 text-[11px]">Click a region to show its rows below the map.</p>
           </div>
-          <div id="map-legend" class="flex items-center gap-2 text-[10px] text-slate-500"></div>
+          <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2">
+              <select id="map-search-scope" class="border border-slate-200 rounded-md px-2 py-1 text-[11px] text-white bg-slate-900 focus:outline-none">
+                <option value="region">Selected region</option>
+                <option value="all">All data</option>
+              </select>
+              <input id="map-search-input" type="search" placeholder="Search map data" class="border border-slate-200 rounded-md px-2 py-1 text-[11px] text-white bg-slate-900 focus:outline-none" />
+              <button id="map-search-btn" type="button" class="border border-slate-200 text-slate-700 hover:text-slate-900 hover:border-brand-500 transition-colors rounded-md px-2.5 py-1 text-[11px] font-semibold">Search</button>
+            </div>
+            <div id="map-legend" class="flex items-center gap-2 text-[10px] text-slate-500"></div>
+          </div>
         </div>
         <div id="ph-map" class="w-full h-[460px] bg-slate-50"></div>
       </section>
@@ -307,6 +317,10 @@ HTML;
           </div>
           <div class="flex items-center gap-3">
             <p id="map-table-meta" class="text-[11px] text-slate-500">Click a region on the map to show its rows here.</p>
+            <select id="map-download-scope" class="hidden border border-slate-200 rounded-md px-2 py-1 text-[11px] text-white bg-slate-900 focus:outline-none">
+              <option value="shown">Rows shown</option>
+              <option value="all">All in scope</option>
+            </select>
             <button id="map-download-csv" type="button" class="hidden border border-slate-200 text-slate-700 hover:text-slate-900 hover:border-brand-500 transition-colors rounded-md px-2.5 py-1 text-[11px] font-semibold">Download CSV</button>
           </div>
         </div>
