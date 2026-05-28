@@ -214,34 +214,46 @@ if ($activeFile) {
               </div>
             </div>
             <div id="filter-panel-{$type}" class="hidden px-4 py-3 bg-slate-950 border-b border-slate-700">
-              <div class="flex flex-wrap gap-5 items-start">
-                <div>
-                  <p class="text-slate-500 text-[10px] uppercase tracking-widest mb-2">Filter by value (specific)</p>
-                  <div class="flex gap-2 flex-wrap">
-                    <select id="filter-col-{$type}" class="bg-white border border-slate-200 text-black rounded-md px-2 py-1 text-xs focus:outline-none">
-                      <option value="">— none —</option>
-                    </select>
-                    <select id="filter-val-{$type}" class="hidden bg-white border border-brand-600 text-black rounded-md px-2 py-1 text-xs max-w-[180px] focus:outline-none">
-                      <option value="">All values</option>
-                    </select>
-                    <select id="filter-col2-{$type}" class="hidden bg-white border border-slate-200 text-black rounded-md px-2 py-1 text-xs focus:outline-none">
-                      <option value="">More specific column</option>
-                    </select>
-                    <select id="filter-val2-{$type}" class="hidden bg-white border border-brand-600 text-black rounded-md px-2 py-1 text-xs max-w-[180px] focus:outline-none">
-                      <option value="">All values</option>
-                    </select>
-                    <select id="filter-col3-{$type}" class="hidden bg-white border border-slate-200 text-black rounded-md px-2 py-1 text-xs focus:outline-none">
-                      <option value="">Most specific column</option>
-                    </select>
-                    <select id="filter-val3-{$type}" class="hidden bg-white border border-brand-600 text-black rounded-md px-2 py-1 text-xs max-w-[180px] focus:outline-none">
-                      <option value="">All values</option>
-                    </select>
-                    <button id="filter-clear-{$type}" class="hidden clear-btn border border-slate-700 text-slate-500 rounded-md px-2 py-1 text-[11px]">Clear</button>
+              <div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_280px] items-start">
+                <div class="space-y-3">
+                  <div>
+                    <p class="text-slate-500 text-[10px] uppercase tracking-widest mb-2">Level 1 filter</p>
+                    <div class="flex flex-wrap gap-2 items-center">
+                      <select id="filter-col-{$type}" class="bg-white border border-slate-200 text-black rounded-md px-2 py-1 text-xs focus:outline-none min-w-[190px]">
+                        <option value="">— none —</option>
+                      </select>
+                      <button id="filter-add-{$type}" class="hidden border border-brand-600 bg-brand-600 text-white rounded-md px-3 py-1 text-[11px] font-semibold hover:bg-brand-700">Add</button>
+                      <button id="filter-clear-{$type}" class="hidden clear-btn border border-slate-700 text-slate-300 rounded-md px-2 py-1 text-[11px]">Clear</button>
+                    </div>
+                    <p class="mt-2 text-[10px] text-slate-400">Pick one region/value, then click Add if you want to keep more than one (up to 10).</p>
+                  </div>
+
+                  <div id="filter-level1-rows-{$type}" class="space-y-2"></div>
+
+                  <div>
+                    <p class="text-slate-500 text-[10px] uppercase tracking-widest mb-2">Series</p>
+                    <div id="series-toggles-{$type}" class="flex flex-wrap gap-2"></div>
                   </div>
                 </div>
-                <div>
-                  <p class="text-slate-500 text-[10px] uppercase tracking-widest mb-2">Series</p>
-                  <div id="series-toggles-{$type}" class="flex flex-wrap gap-2"></div>
+
+                <div class="rounded-xl border border-slate-800 bg-slate-900/80 p-3">
+                  <p class="text-slate-400 text-[10px] uppercase tracking-widest mb-2">Optional level 2 / 3</p>
+                  <div class="flex flex-wrap gap-2 items-center mb-3">
+                    <select id="filter-col2-{$type}" class="hidden bg-white border border-slate-200 text-black rounded-md px-2 py-1 text-xs focus:outline-none min-w-[180px]">
+                      <option value="">More specific column</option>
+                    </select>
+                    <select id="filter-val2-{$type}" class="hidden bg-white border border-brand-600 text-black rounded-md px-2 py-1 text-xs max-w-[180px] focus:outline-none min-w-[170px]">
+                      <option value="">Select value</option>
+                    </select>
+                  </div>
+                  <div class="flex flex-wrap gap-2 items-center">
+                    <select id="filter-col3-{$type}" class="hidden bg-white border border-slate-200 text-black rounded-md px-2 py-1 text-xs focus:outline-none min-w-[180px]">
+                      <option value="">Most specific column</option>
+                    </select>
+                    <select id="filter-val3-{$type}" class="hidden bg-white border border-brand-600 text-black rounded-md px-2 py-1 text-xs max-w-[180px] focus:outline-none min-w-[170px]">
+                      <option value="">Select value</option>
+                    </select>
+                  </div>
                 </div>
               </div>
               <p id="filter-guide-{$type}" class="mt-2 text-[10px] text-slate-400">
@@ -255,7 +267,7 @@ if ($activeFile) {
               <div class="px-4 py-2 flex items-center justify-between gap-3">
                 <p id="table-meta-{$type}" class="text-[11px] text-slate-500">No rows</p>
                 <button id="btn-download-table-{$type}" type="button" class="hidden border border-slate-200 text-slate-700 hover:text-slate-900 hover:border-brand-500 transition-colors rounded-md px-2.5 py-1 text-[11px] font-semibold">
-                  Download XLSX
+                  Download Data
                 </button>
               </div>
               <div class="max-h-44 overflow-auto">
@@ -280,11 +292,30 @@ HTML;
         <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between gap-3">
           <div>
             <p class="text-black font-semibold text-sm">Philippines Map</p>
-            <p class="text-slate-400 text-[11px]">Hover a region to see total construction cost.</p>
+            <p class="text-slate-400 text-[11px]">Click a region to show its rows below the map.</p>
           </div>
           <div id="map-legend" class="flex items-center gap-2 text-[10px] text-slate-500"></div>
         </div>
         <div id="ph-map" class="w-full h-[460px] bg-slate-50"></div>
+      </section>
+
+      <section id="map-results-panel" class="hidden bg-white rounded-2xl border border-slate-200 overflow-hidden mb-5">
+        <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between gap-3">
+          <div>
+            <p class="text-black font-semibold text-sm">Map Region Data</p>
+            <p class="text-slate-400 text-[11px]">Selected region: <span id="map-selected-region" class="font-semibold text-slate-700"></span></p>
+          </div>
+          <div class="flex items-center gap-3">
+            <p id="map-table-meta" class="text-[11px] text-slate-500">Click a region on the map to show its rows here.</p>
+            <button id="map-download-csv" type="button" class="hidden border border-slate-200 text-slate-700 hover:text-slate-900 hover:border-brand-500 transition-colors rounded-md px-2.5 py-1 text-[11px] font-semibold">Download CSV</button>
+          </div>
+        </div>
+        <div class="max-h-72 overflow-auto">
+          <table class="min-w-full text-[11px]">
+            <thead id="map-table-head" class="sticky top-0 bg-slate-50"></thead>
+            <tbody id="map-table-body" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
       </section>
 
     </section>
@@ -332,6 +363,12 @@ HTML;
       });
     })();
   </script>
-  <script src="js/app.js"></script>
+  <script src="js/dashboard-core.js"></script>
+  <script src="js/dashboard-data.js"></script>
+  <script src="js/dashboard-map.js"></script>
+  <script src="js/dashboard-filters.js"></script>
+  <script src="js/dashboard-charts.js"></script>
+  <script src="js/dashboard-downloads.js"></script>
+  <script src="js/dashboard-ui.js"></script>
 </body>
 </html>
