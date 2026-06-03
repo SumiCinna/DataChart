@@ -1,9 +1,17 @@
 <?php
 // staff.php  –  File management (staff + admin only)
 require_once 'includes/db.php';
-requireRole('staff', 'admin');
+requireLogin();
 
 $user = currentUser();
+if ($user['role'] === 'admin') {
+  header('Location: admin.php');
+  exit;
+}
+if ($user['role'] !== 'staff') {
+  header('Location: dashboard.php');
+  exit;
+}
 $pdo  = getPDO();
 $msg  = '';
 $err  = '';

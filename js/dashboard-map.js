@@ -239,16 +239,6 @@ document.addEventListener('click', e => {
   downloadMapSelectionCsv();
 });
 
-document.addEventListener('click', e => {
-  const btn = e.target.closest('#map-search-btn');
-  if (!btn) return;
-  e.preventDefault();
-  const input = document.getElementById('map-search-input');
-  if (!input) return;
-  state.map.searchQuery = String(input.value || '').trim();
-  renderMapSelectionTable();
-});
-
 document.addEventListener('input', e => {
   const input = e.target.closest('#map-search-input');
   if (!input) return;

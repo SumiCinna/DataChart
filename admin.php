@@ -111,8 +111,6 @@ $token = csrfToken();
       <div class="ml-auto flex items-center gap-3">
         <span class="role-badge role-admin">Admin</span>
         <span class="text-white text-xs hidden sm:inline"><?= htmlspecialchars($user['full_name']) ?></span>
-        <a href="dashboard.php" class="nav-link-btn">Dashboard</a>
-        <a href="staff.php" class="nav-link-btn">Files</a>
         <a href="logout.php" class="logout-trigger nav-link-btn">Sign out</a>
       </div>
     </div>

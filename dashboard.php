@@ -6,8 +6,14 @@ requireLogin();
 $user = currentUser();
 $role = $user['role'];
 
-if (!in_array($role, ['admin','staff','boss'])) {
-    header('Location: index.php'); exit;
+if ($role === 'admin') {
+  header('Location: admin.php');
+  exit;
+}
+
+if (!in_array($role, ['staff','boss'], true)) {
+  header('Location: index.php');
+  exit;
 }
 
 $pdo = getPDO();
@@ -78,11 +84,8 @@ if ($activeFile) {
         </span>
         <span class="text-white text-xs hidden sm:inline"><?= htmlspecialchars($user['full_name']) ?></span>
 
-        <?php if ($role === 'staff' || $role === 'admin'): ?>
+        <?php if ($role === 'staff'): ?>
           <a href="staff.php" class="nav-link-btn">Files</a>
-        <?php endif; ?>
-        <?php if ($role === 'admin'): ?>
-          <a href="admin.php" class="nav-link-btn">Admin</a>
         <?php endif; ?>
 
         <button id="btn-download-all" class="hidden bg-brand-600 hover:bg-brand-500 transition-colors text-white text-xs font-semibold rounded-md px-4 py-1.5 flex items-center gap-2">
@@ -301,7 +304,6 @@ HTML;
                 <option value="all">All data</option>
               </select>
               <input id="map-search-input" type="search" placeholder="Search map data" class="border border-slate-200 rounded-md px-2 py-1 text-[11px] text-white bg-slate-900 focus:outline-none" />
-              <button id="map-search-btn" type="button" class="border border-slate-200 text-slate-700 hover:text-slate-900 hover:border-brand-500 transition-colors rounded-md px-2.5 py-1 text-[11px] font-semibold">Search</button>
             </div>
             <div id="map-legend" class="flex items-center gap-2 text-[10px] text-slate-500"></div>
           </div>
