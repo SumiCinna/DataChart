@@ -54,9 +54,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         if ($action === 'delete') {
-            $pdo->prepare('DELETE FROM users WHERE id=?')->execute([$targetId]);
-            auditLog('admin_delete_user', "id=$targetId");
-            $msg = 'Account deleted.';
+          $adminPassword = $_POST['admin_password'] ?? '';
+          if ($adminPassword === '') {
+            $err = 'Admin password is required to delete an account.';
+          } else {
+            $stmt = $pdo->prepare('SELECT password FROM users WHERE id=? LIMIT 1');
+            $stmt->execute([(int)$user['id']]);
+            $adminRow = $stmt->fetch();
+            if (!$adminRow || !password_verify($adminPassword, $adminRow['password'])) {
+              $err = 'Admin password is incorrect.';
+            } else {
+              $pdo->prepare('DELETE FROM users WHERE id=?')->execute([$targetId]);
+              auditLog('admin_delete_user', "id=$targetId");
+              $msg = 'Account deleted.';
+            }
+          }
         }
     }
 }
@@ -243,14 +255,15 @@ $token = csrfToken();
                           <input type="hidden" name="csrf_token" value="<?= $token ?>">
                           <input type="hidden" name="action" value="deactivate">
                           <input type="hidden" name="user_id" value="<?= $u['id'] ?>">
-                          <button class="btn-sm btn-ghost">Deactivate</button>
+                          <button class="btn-sm btn-ghost deactivate-trigger">Deactivate</button>
                         </form>
                       <?php endif; ?>
-                      <form method="POST" class="inline" onsubmit="return confirm('Permanently delete this account?')">
+                      <form method="POST" class="inline">
                         <input type="hidden" name="csrf_token" value="<?= $token ?>">
                         <input type="hidden" name="action" value="delete">
                         <input type="hidden" name="user_id" value="<?= $u['id'] ?>">
-                        <button class="btn-sm btn-red">Delete</button>
+                        <input type="hidden" name="admin_password" value="">
+                        <button class="btn-sm btn-red delete-trigger">Delete</button>
                       </form>
                     </div>
                   <?php else: ?>
@@ -275,6 +288,31 @@ $token = csrfToken();
       </div>
     </div>
   </div>
+  <div id="deactivate-modal" class="hidden fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center px-4">
+    <div class="w-80 max-w-[90vw] rounded-xl border border-slate-200 bg-white p-5 shadow-2xl">
+      <h3 class="text-base font-bold text-slate-900 mb-2">Confirm Deactivate</h3>
+      <p class="text-sm text-slate-600 mb-5">Deactivate this account? The user will no longer be able to sign in.</p>
+      <div class="flex gap-3">
+        <button id="deactivate-cancel-btn" type="button" class="flex-1 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+        <button id="deactivate-confirm-btn" type="button" class="flex-1 rounded-md border border-blue-600 bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Deactivate</button>
+      </div>
+    </div>
+  </div>
+  <div id="delete-modal" class="hidden fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center px-4">
+    <div class="w-96 max-w-[92vw] rounded-xl border border-slate-200 bg-white p-5 shadow-2xl">
+      <h3 class="text-base font-bold text-slate-900 mb-2">Confirm Delete</h3>
+      <p class="text-sm text-slate-600 mb-4">This action is permanent. Enter your admin password to continue.</p>
+      <div class="mb-5">
+        <label for="delete-admin-password" class="text-xs font-semibold text-slate-700">Admin password</label>
+        <input id="delete-admin-password" type="password" autocomplete="current-password" class="mt-2 w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:outline-none" placeholder="••••••••" />
+        <p id="delete-password-error" class="hidden text-[11px] text-red-600 mt-2">Please enter your password.</p>
+      </div>
+      <div class="flex gap-3">
+        <button id="delete-cancel-btn" type="button" class="flex-1 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+        <button id="delete-confirm-btn" type="button" class="flex-1 rounded-md border border-red-600 bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">Delete</button>
+      </div>
+    </div>
+  </div>
   <script>
     (function () {
       const modal = document.getElementById('logout-modal');
@@ -295,6 +333,82 @@ $token = csrfToken();
 
       cancelBtn?.addEventListener('click', closeModal);
       confirmBtn?.addEventListener('click', () => { window.location.href = pendingHref; });
+      modal?.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) closeModal();
+      });
+    })();
+
+    (function () {
+      const modal = document.getElementById('deactivate-modal');
+      const cancelBtn = document.getElementById('deactivate-cancel-btn');
+      const confirmBtn = document.getElementById('deactivate-confirm-btn');
+      let pendingForm = null;
+
+      function closeModal() {
+        modal?.classList.add('hidden');
+        pendingForm = null;
+      }
+
+      document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.deactivate-trigger');
+        if (!btn) return;
+        e.preventDefault();
+        pendingForm = btn.closest('form');
+        if (!pendingForm) return;
+        modal?.classList.remove('hidden');
+      });
+
+      cancelBtn?.addEventListener('click', closeModal);
+      confirmBtn?.addEventListener('click', () => { pendingForm?.submit(); });
+      modal?.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) closeModal();
+      });
+    })();
+
+    (function () {
+      const modal = document.getElementById('delete-modal');
+      const cancelBtn = document.getElementById('delete-cancel-btn');
+      const confirmBtn = document.getElementById('delete-confirm-btn');
+      const passwordInput = document.getElementById('delete-admin-password');
+      const passwordError = document.getElementById('delete-password-error');
+      let pendingForm = null;
+
+      function resetModal() {
+        if (passwordInput) passwordInput.value = '';
+        passwordError?.classList.add('hidden');
+      }
+
+      function closeModal() {
+        modal?.classList.add('hidden');
+        pendingForm = null;
+        resetModal();
+      }
+
+      document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.delete-trigger');
+        if (!btn) return;
+        e.preventDefault();
+        pendingForm = btn.closest('form');
+        if (!pendingForm) return;
+        resetModal();
+        modal?.classList.remove('hidden');
+        passwordInput?.focus();
+      });
+
+      cancelBtn?.addEventListener('click', closeModal);
+      confirmBtn?.addEventListener('click', () => {
+        const value = String(passwordInput?.value || '').trim();
+        if (!value) {
+          passwordError?.classList.remove('hidden');
+          passwordInput?.focus();
+          return;
+        }
+        const hiddenField = pendingForm?.querySelector('input[name="admin_password"]');
+        if (hiddenField) hiddenField.value = value;
+        pendingForm?.submit();
+      });
       modal?.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) closeModal();
